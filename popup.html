@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    :root {
+      --white: #FFFFFFff;
+      --black: #010100ff;
+      --cinnabar: #FF442Fff;
+      --misty-rose: #EDDAD8ff;
+      --snow: #F9F4F3ff;
+    }
+
+    body {
+      width: 320px;
+      padding: 0;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--white);
+      position: relative;
+      top: -8px; /* Move entire popup up to align with Clio header */
+    }
+    
+    .header {
+      background: var(--black);
+      padding: 16.5px 20px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .header h1 {
+      margin: 0;
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--cinnabar);
+      letter-spacing: 0.5px;
+    }
+    
+    .content {
+      padding: 20px;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    .feature-item {
+      display: flex;
+      align-items: center;
+      padding: 16px 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+    
+    .feature-name {
+      font-weight: 600;
+      flex: 1;
+      font-size: 15px;
+      color: #333;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 52px;
+      height: 26px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .3s;
+      border-radius: 24px;
+    }
+    
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+      background-color: var(--cinnabar);
+    }
+    
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    
+    .help-drawer {
+      margin-top: 15px;
+      border-top: 1px solid #e0e0e0;
+      overflow: hidden;
+    }
+    
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      padding: 16px 0 12px;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+    
+    .drawer-title {
+      font-weight: 600;
+      flex: 1;
+      font-size: 15px;
+      color: #333;
+    }
+    
+    .drawer-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease;
+      color: var(--cinnabar);
+      opacity: 0.9;
+    }
+    
+    .drawer-content {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      padding: 0 5px;
+    }
+    
+    .drawer-content.open {
+      max-height: 300px;
+    }
+    
+    .drawer-icon.open {
+      transform: rotate(180deg);
+    }
+    
+    .shortcut {
+      display: flex;
+      margin: 10px 0;
+      font-size: 14px;
+      align-items: center;
+    }
+    
+    .shortcut-key {
+      font-weight: 600;
+      margin-right: 10px;
+      color: var(--cinnabar);
+      background: rgba(255, 68, 47, 0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    
+    .shortcut-desc {
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Linqly</h1>
+  </div>
+  <div class="content">
+    <div class="feature-item">
+      <div class="feature-name">Enable Linqly</div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="toggle-enabled">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="help-drawer">
+      <div class="drawer-header" id="drawer-toggle">
+        <div class="drawer-title">How to use Linqly</div>
+        <div class="drawer-icon">▼</div>
+      </div>
+      <div class="drawer-content" id="drawer-content">
+        <div class="shortcut">
+          <div class="shortcut-key">Click</div>
+          <div class="shortcut-desc">on any row to select it</div>
+        </div>
+        <div class="shortcut">
+          <div class="shortcut-key">Shift+Click</div>
+          <div class="shortcut-desc">to select a range of rows</div>
+        </div>
+        <div class="shortcut">
+          <div class="shortcut-key">Esc</div>
+          <div class="shortcut-desc">to clear selection</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

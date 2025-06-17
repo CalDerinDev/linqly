@@ -1,0 +1,28 @@
+/* Linqly - Enhanced Clio Selection Styles */
+
+/* Selected row styling */
+tr.custom-selected {
+  background-color: rgba(66, 165, 245, 0.1) !important;
+  border-left: 3px solid #42a5f5 !important;
+}
+
+/* Hover effects for selectable rows */
+tr[data-uid]:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Selected row hover state */
+tr.custom-selected:hover {
+  background-color: rgba(66, 165, 245, 0.15) !important;
+}
+
+/* Enhanced cursor and selection behavior */
+tr.selectable-enhanced {
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+/* Subtle animation for selection changes */
+tr[data-uid] {
+  transition: background-color 0.15s ease, border-left 0.15s ease;
+}

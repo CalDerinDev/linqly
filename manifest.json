@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Linqly for Clio",
+  "version": "1.0.0",
+  "description": "Enhanced productivity tools for Clio - Advanced table selection, bulk actions, and workflow improvements.",
+  "permissions": [
+    "scripting",
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "management"
+  ],
+  "host_permissions": [
+    "https://*.clio.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://*.clio.com/*"],
+      "exclude_matches": ["https://*.clio.com/communications*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.clio.com/communications*"],
+      "js": ["communications.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Linqly Settings",
+    "default_icon": {
+      "16": "images/icon-16.png",
+      "48": "images/icon-48.png",
+      "128": "images/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "images/icon-16.png",
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["https://*.clio.com/*"]
+    }
+  ]
+}
