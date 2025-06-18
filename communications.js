@@ -18,6 +18,7 @@ class CommunicationsRowSelector {
     // Initial setup
     this.setupRowClickHandlers();
     this.setupRouteObserver();
+    this.setupDeselectHandlers();
     
     // Try again after a short delay in case the table isn't loaded yet
     const retryInterval = setInterval(() => {
@@ -75,6 +76,53 @@ class CommunicationsRowSelector {
     console.log('[Linqly] Route observer initialized');
   }
   
+  setupDeselectHandlers() {
+    // Bind methods to maintain correct 'this' context
+    this.boundHandleKeydown = this.handleKeydown.bind(this);
+    this.boundHandlePageClick = this.handlePageClick.bind(this);
+    
+    // Add event listeners
+    document.addEventListener('keydown', this.boundHandleKeydown);
+    document.addEventListener('click', this.boundHandlePageClick, true);
+    
+    console.log('[Linqly] Deselect handlers initialized');
+  }
+  
+  deselectAll() {
+    // Find the clear selection button - try multiple selectors for different frameworks
+    const clearButton = document.querySelector('a.counter-clear[ng-click*="clearSelection"], button[ng-click*="clearSelection"], .clear-selection, [data-action="clear-selection"], a[data-testid="clear-selection"], a[x-on\\:click*="selected = []"]');
+    
+    if (clearButton) {
+      console.log('[Linqly] Found clear selection button, clicking it');
+      clearButton.click();
+    } else {
+      console.log('[Linqly] Clear selection button not found');
+    }
+  }
+  
+  handleKeydown(event) {
+    if (event.key === 'Escape') {
+      this.deselectAll();
+    }
+  }
+  
+  handlePageClick(event) {
+    const target = event.target;
+    
+    // Exit if the user clicked on a link, button, or an icon within a button
+    if (target.closest('a, button, [role="button"]')) {
+      return;
+    }
+    
+    // Find the communications table
+    const communicationsTable = document.getElementById('communications_logs_data_table');
+    
+    // If we clicked outside the communications table area, deselect all
+    if (communicationsTable && !target.closest('#communications_logs_data_table')) {
+      this.deselectAll();
+    }
+  }
+  
   cleanup() {
     if (this.observer) {
       this.observer.disconnect();
@@ -84,6 +132,17 @@ class CommunicationsRowSelector {
     const table = document.getElementById('communications_logs_data_table');
     if (table) {
       table.removeEventListener('click', this.handleTableClick);
+    }
+    
+    // Remove deselect handlers
+    if (this.boundHandleKeydown) {
+      document.removeEventListener('keydown', this.boundHandleKeydown);
+      this.boundHandleKeydown = null;
+    }
+    
+    if (this.boundHandlePageClick) {
+      document.removeEventListener('click', this.boundHandlePageClick, true);
+      this.boundHandlePageClick = null;
     }
     
     this.isInitialized = false;
