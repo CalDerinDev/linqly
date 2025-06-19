@@ -87,6 +87,7 @@ const rowClickSelectFeature = {
     routeObserver: null,
     currentPath: '',
     isInitialized: false,
+    lastClickedRow: null,
     
     /* Run on Clio dashboard and specific pages */
     shouldInitialize() {
@@ -138,6 +139,7 @@ const rowClickSelectFeature = {
             console.log('[Linqly] Not on supported page, ensuring detached');
             this.detach();
         }
+        this.lastClickedRow = null;
     },
     
     /* Setup route change detection */
@@ -284,6 +286,15 @@ const rowClickSelectFeature = {
         
         // Store reference to bound function for removal
         const handleClick = (event) => {
+            // Ignore synthetic events triggered by scripts (like Clio's Angular framework)
+            if (!event.isTrusted) {
+                console.log('[Linqly] Ignoring synthetic event (not user-triggered)');
+                return;
+            }
+
+            console.log('[Linqly] Click event detected. Shift key pressed?', event.shiftKey);
+            console.log('[Linqly] Current lastClickedRow:', this.lastClickedRow);
+
             const path = window.location.pathname + window.location.hash;
             const isDocumentsPage = path.includes('/documents') || path.includes('#/documents');
             const isMattersPage = path.includes('/matters') || path.includes('#/matters');
@@ -294,7 +305,7 @@ const rowClickSelectFeature = {
             
             // For Documents page, allow native checkbox clicks to work
             if (isDocumentsPage && isCheckboxClick) {
-                // Let the native checkbox handle the click
+                console.log('[Linqly] Direct checkbox click on documents page, letting native handler work');
                 return;
             }
             
@@ -303,153 +314,173 @@ const rowClickSelectFeature = {
                                 event.target.closest('a, button, select, textarea, [role="button"], [role="tab"]');
             
             if (isInteractive) {
+                console.log('[Linqly] Click on interactive element, ignoring');
                 return;
             }
             
             const selectors = this.getSelectors();
             const row = event.target.closest(selectors.row);
-            if (!row) return;
+            if (!row) {
+                console.log('[Linqly] Click outside row, resetting lastClickedRow');
+                this.lastClickedRow = null;
+                return;
+            }
 
             // Find the checkbox in the row
             const checkbox = row.querySelector(selectors.checkbox);
             if (!checkbox) {
                 console.log('[Linqly] Checkbox not found with selector:', selectors.checkbox);
+                console.log('[Linqly] Row HTML:', row.outerHTML.substring(0, 500));
+                console.log('[Linqly] Available checkboxes in row:', row.querySelectorAll('input[type="checkbox"]'));
                 return;
             }
             
-            console.log('[Linqly] Toggling row selection for checkbox:', checkbox);
+            console.log('[Linqly] Found checkbox:', checkbox);
+            console.log('[Linqly] Checkbox checked state:', checkbox.checked);
+            console.log('[Linqly] Checkbox attributes:', {
+                type: checkbox.type,
+                ngModel: checkbox.getAttribute('ng-model'),
+                className: checkbox.className,
+                id: checkbox.id
+            });
             
             try {
-                // Get current page path for conditional logic
-                const path = window.location.pathname + window.location.hash;
-                const isDocumentsPage = path.includes('/documents') || path.includes('#/documents');
-                const isMattersPage = path.includes('/matters') || path.includes('#/matters');
-                
-                // Toggle the checkbox state
-                const newState = !checkbox.checked;
-                checkbox.checked = newState;
-                
-                // For Matters page - handle Angular checkboxes
-                if (isMattersPage && checkbox.hasAttribute('ng-model')) {
-                    console.log('[Linqly] Handling Angular checkbox on matters page');
+                // Prevent text selection during shift-click
+                if (event.shiftKey) {
+                    event.preventDefault();
+                }
+
+                // Handle shift-click range selection
+                if (event.shiftKey && this.lastClickedRow) {
+                    console.log('[Linqly] Running SHIFT-CLICK logic');
+                    console.log('[Linqly] Anchor row:', this.lastClickedRow);
+                    console.log('[Linqly] Target row:', row);
                     
-                    // Check if we're on the main matters page or a subtab
-                    const currentUrl = window.location.href;
-                    const isMainMattersPage = currentUrl.includes('/matters?') || 
-                                             currentUrl.includes('#/matters?') || 
-                                             currentUrl.match(/\/matters$/) || 
-                                             currentUrl.match(/#\/matters$/);
-                    const isMattersSubtab = currentUrl.includes('/matters/') && currentUrl.split('/').length > 4;
-                    
-                    console.log('[Linqly] Current URL:', currentUrl);
-                    console.log('[Linqly] Main matters page:', isMainMattersPage, 'Subtab:', isMattersSubtab);
-                    
-                    // For main matters page, try a more direct approach
-                    if (isMainMattersPage) {
-                        console.log('[Linqly] Using direct approach for main matters page');
-                        // Set the checked state directly and dispatch events
-                        checkbox.checked = newState;
-                        
-                        // Dispatch change and input events
-                        ['change', 'input'].forEach(eventType => {
-                            const evt = new Event(eventType, { 
-                                bubbles: true, 
-                                cancelable: true
-                            });
-                            checkbox.dispatchEvent(evt);
-                        });
-                        
-                        // Also try clicking the parent container
-                        const parentContainer = checkbox.closest('.th-checkbox, td.row-selection-checkbox');
-                        if (parentContainer && parentContainer !== checkbox) {
-                            parentContainer.click();
-                        }
-                    } else {
-                        // For subtabs, use the simple click approach
-                        console.log('[Linqly] Using simple click for subtab');
-                        if (typeof checkbox.click === 'function') {
-                            console.log('[Linqly] Using checkbox.click() method');
-                            checkbox.click();
-                        } else {
-                            console.log('[Linqly] Using fallback click event dispatch');
-                            // Fallback: dispatch a simple click event
-                            const clickEvent = new MouseEvent('click', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true
-                            });
-                            checkbox.dispatchEvent(clickEvent);
-                        }
+                    // Get the grid body (table body) that contains both rows
+                    const gridBody = row.closest('tbody');
+                    if (!gridBody) {
+                        console.log('[Linqly] No grid body found');
+                        return;
                     }
                     
-                    return;
-                }
-                
-                // For Documents page - use direct click which we know works
-                if (isDocumentsPage) {
-                    if (typeof checkbox.click === 'function') {
-                        checkbox.click();
-                    }
-                    return;
-                }
-                
-                // For other pages - try multiple approaches to ensure the checkbox toggles
-                
-                // 1. First try the direct approach that works for Documents
-                if (typeof checkbox.click === 'function') {
-                    checkbox.click();
-                }
-                
-                // 2. If that didn't work, try dispatching a click event with all necessary properties
-                const clickEvent = new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true,
-                    button: 0,
-                    buttons: 1,
-                    clientX: 0,
-                    clientY: 0
-                });
-                
-                // Add common properties that might be expected
-                Object.defineProperties(clickEvent, {
-                    target: { value: checkbox },
-                    currentTarget: { value: checkbox },
-                    srcElement: { value: checkbox },
-                    composed: { value: true }
-                });
-                
-                // Dispatch the click event
-                checkbox.dispatchEvent(clickEvent);
-                
-                // 3. Also try toggling the checked state and dispatching change/input events
-                setTimeout(() => {
-                    checkbox.checked = newState;
+                    // Step A: Get all rows and filter for only those VISIBLE to the user
+                    const allRowsInDom = Array.from(gridBody.querySelectorAll(selectors.row));
+                    const visibleRows = allRowsInDom.filter(row => row.offsetParent !== null);
                     
-                    // Dispatch change and input events
-                    ['change', 'input'].forEach(eventType => {
-                        const evt = new Event(eventType, { 
-                            bubbles: true, 
-                            cancelable: true,
-                            view: window
-                        });
-                        checkbox.dispatchEvent(evt);
+                    console.log('[Linqly] Found', visibleRows.length, 'visible rows');
+                    
+                    // Step B: Get the stable UID from each visible row. This list will not become stale.
+                    const visibleRowUids = visibleRows.map(row => {
+                        // Try different UID attributes that Clio might use
+                        return row.getAttribute('data-uid') || 
+                               row.getAttribute('data-kendo-uid') || 
+                               row.getAttribute('id') || 
+                               row.getAttribute('data-row-index') ||
+                               row.textContent.trim().substring(0, 50); // Fallback to text content
                     });
                     
-                    // Try clicking the row if it's a Kendo UI row
-                    if (row && (row.classList.contains('k-master-row') || row.classList.contains('k-grid-edit-row'))) {
-                        row.click();
+                    console.log('[Linqly] Row UIDs:', visibleRowUids);
+                    
+                    // Step C: Find the start and end positions in our stable UID array.
+                    const startUid = this.getRowUid(this.lastClickedRow);
+                    const endUid = this.getRowUid(row);
+                    const startIndex = visibleRowUids.indexOf(startUid);
+                    const endIndex = visibleRowUids.indexOf(endUid);
+                    
+                    console.log('[Linqly] Start UID:', startUid, 'End UID:', endUid);
+                    console.log('[Linqly] Row indices - Start:', startIndex, 'End:', endIndex);
+                    
+                    // Ensure we have valid start/end points
+                    if (startIndex === -1 || endIndex === -1) {
+                        console.log('[Linqly] Invalid start or end index');
+                        return;
                     }
-                }, 10);
+                    
+                    const rangeStart = Math.min(startIndex, endIndex);
+                    const rangeEnd = Math.max(startIndex, endIndex);
+                    
+                    console.log('[Linqly] Processing range from index', rangeStart, 'to', rangeEnd);
+                    
+                    // Step D: Loop through the STABLE UID array.
+                    for (let i = rangeStart; i <= rangeEnd; i++) {
+                        const currentUid = visibleRowUids[i];
+                        
+                        // Skip processing the anchor row and target row - they get special handling
+                        if (currentUid === startUid) {
+                            console.log('[Linqly] Skipping anchor row processing to preserve its state');
+                            continue;
+                        }
+                        
+                        if (currentUid === endUid) {
+                            console.log('[Linqly] Skipping target row in main loop - will handle separately');
+                            continue;
+                        }
+                        
+                        // Step E: On each iteration, find the FRESH, LIVE row from the DOM.
+                        const liveRow = gridBody.querySelector(`tr[data-uid="${currentUid}"], tr[data-kendo-uid="${currentUid}"], tr[id="${currentUid}"], tr[data-row-index="${currentUid}"]`);
+                        
+                        // If not found by attribute, try to find by text content (fallback)
+                        let foundRow = liveRow;
+                        if (!foundRow) {
+                            foundRow = Array.from(gridBody.querySelectorAll(selectors.row)).find(row => 
+                                this.getRowUid(row) === currentUid
+                            );
+                        }
+                        
+                        if (foundRow) {
+                            const checkboxInRange = foundRow.querySelector(selectors.checkbox);
+                            if (checkboxInRange) {
+                                console.log('[Linqly] Processing row', i, 'with UID:', currentUid);
+                                this.setCheckboxState(checkboxInRange, true, foundRow, isMattersPage);
+                            }
+                        } else {
+                            console.log('[Linqly] Could not find live row for UID:', currentUid);
+                        }
+                    }
+                    
+                    // Special handling for the target row (last row in range) to ensure it's selected
+                    const targetUid = endUid;
+                    console.log('[Linqly] Looking for target row with UID:', targetUid);
+                    
+                    const targetLiveRow = gridBody.querySelector(`tr[data-uid="${targetUid}"], tr[data-kendo-uid="${targetUid}"], tr[id="${targetUid}"], tr[data-row-index="${targetUid}"]`);
+                    
+                    if (targetLiveRow) {
+                        console.log('[Linqly] Found target live row:', targetLiveRow);
+                        const targetCheckbox = targetLiveRow.querySelector(selectors.checkbox);
+                        if (targetCheckbox) {
+                            console.log('[Linqly] Found target checkbox:', targetCheckbox);
+                            console.log('[Linqly] Target checkbox current state:', targetCheckbox.checked);
+                            console.log('[Linqly] Ensuring target row is selected:', targetUid);
+                            this.setCheckboxState(targetCheckbox, true, targetLiveRow, isMattersPage);
+                            console.log('[Linqly] Target checkbox state after processing:', targetCheckbox.checked);
+                        } else {
+                            console.log('[Linqly] Target checkbox not found in target row');
+                        }
+                    } else {
+                        console.log('[Linqly] Target live row not found for UID:', targetUid);
+                    }
+                    
+                    // Do not update lastClickedRow during shift-click
+                    console.log('[Linqly] Shift-click complete, preserving anchor row');
+                } else {
+                    console.log('[Linqly] Running NORMAL CLICK logic');
+                    // Normal click behavior - toggle the checkbox
+                    const newState = !checkbox.checked;
+                    this.setCheckboxState(checkbox, newState, row, isMattersPage);
+                    
+                    // Update lastClickedRow for future shift-clicks only on normal clicks
+                    this.lastClickedRow = row;
+                    console.log('[Linqly] New anchor row set:', this.lastClickedRow);
+                }
             } catch (error) {
-                console.error('[Linqly] Error toggling checkbox:', error);
+                console.error('[Linqly] Error handling row click:', error);
             }
         };
         
-        // Use capture phase with passive: true to prevent forced reflow
+        // Use capture phase with passive: false to allow preventDefault
         const options = { 
             capture: true,
-            passive: true  // Improves scrolling performance
+            passive: false  // Allow preventDefault for shift-click
         };
         
         container.addEventListener('click', handleClick, options);
@@ -463,9 +494,101 @@ const rowClickSelectFeature = {
         console.log('[Linqly] Delegated listener attached to grid content');
     },
 
+    /* Helper method to get a stable UID for a row */
+    getRowUid(row) {
+        // Try different UID attributes that Clio might use
+        return row.getAttribute('data-uid') || 
+               row.getAttribute('data-kendo-uid') || 
+               row.getAttribute('id') || 
+               row.getAttribute('data-row-index') ||
+               row.textContent.trim().substring(0, 50); // Fallback to text content
+    },
+
+    /* Helper method to set checkbox state and trigger necessary events */
+    setCheckboxState(checkbox, newState, row, isMattersPage) {
+        // For shift-click range selection, always set to true regardless of current state
+        // This ensures all rows in the range are selected, even if some were already selected
+        if (checkbox.checked === newState && newState === true) {
+            console.log('[Linqly] Checkbox already in desired state, but ensuring it stays selected');
+            // Don't return early - still process the checkbox to ensure it stays selected
+        } else if (checkbox.checked === newState) {
+            console.log('[Linqly] Checkbox already in desired state, skipping change');
+            return;
+        }
+
+        console.log('[Linqly] Changing checkbox state from', checkbox.checked, 'to', newState);
+        
+        // Set the checkbox state
+        checkbox.checked = newState;
+        
+        // For Matters page - handle Angular checkboxes
+        if (isMattersPage && checkbox.hasAttribute('ng-model')) {
+            // Dispatch change and input events
+            ['change', 'input'].forEach(eventType => {
+                const evt = new Event(eventType, { 
+                    bubbles: true, 
+                    cancelable: true
+                });
+                checkbox.dispatchEvent(evt);
+            });
+            
+            // Also try clicking the parent container
+            const parentContainer = checkbox.closest('.th-checkbox, td.row-selection-checkbox');
+            if (parentContainer && parentContainer !== checkbox) {
+                parentContainer.click();
+            }
+        } else {
+            // For other pages - try multiple approaches to ensure the checkbox toggles
+            if (typeof checkbox.click === 'function') {
+                checkbox.click();
+            }
+            
+            // Dispatch a click event with all necessary properties
+            const clickEvent = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true,
+                button: 0,
+                buttons: 1,
+                clientX: 0,
+                clientY: 0
+            });
+            
+            Object.defineProperties(clickEvent, {
+                target: { value: checkbox },
+                currentTarget: { value: checkbox },
+                srcElement: { value: checkbox },
+                composed: { value: true }
+            });
+            
+            checkbox.dispatchEvent(clickEvent);
+            
+            // Also dispatch change and input events
+            setTimeout(() => {
+                checkbox.checked = newState;
+                
+                ['change', 'input'].forEach(eventType => {
+                    const evt = new Event(eventType, { 
+                        bubbles: true, 
+                        cancelable: true,
+                        view: window
+                    });
+                    checkbox.dispatchEvent(evt);
+                });
+                
+                // Try clicking the row if it's a Kendo UI row
+                if (row && (row.classList.contains('k-master-row') || row.classList.contains('k-grid-edit-row'))) {
+                    row.click();
+                }
+            }, 10);
+        }
+    },
+
     /* Get the appropriate row and checkbox selectors based on the current page */
     getSelectors() {
         const path = window.location.pathname + window.location.hash;
+        
+        console.log('[Linqly] Getting selectors for path:', path);
         
         // Common selectors that work across all pages
         const common = {
@@ -475,45 +598,55 @@ const rowClickSelectFeature = {
             isCustomCheckbox: false
         };
 
-        // Matters page
+        // Matters page - use more comprehensive selectors
         if (path.includes('/matters') || path.includes('#/matters')) {
-            return {
+            const selectors = {
                 ...common,
-                checkbox: 'td.row-selection-checkbox input[type="checkbox"], .th-checkbox input[type="checkbox"], input[type="checkbox"][ng-model*="checkbox.checked"]',
+                checkbox: 'td.row-selection-checkbox input[type="checkbox"], .th-checkbox input[type="checkbox"], input[type="checkbox"][ng-model*="checkbox.checked"], input[type="checkbox"][ng-model], input[type="checkbox"]',
                 isCustomCheckbox: true
             };
+            console.log('[Linqly] Using Matters page selectors:', selectors);
+            return selectors;
         }
         
         // Billing page
         if (path.includes('/bills') || path.includes('#/bills')) {
-            return {
+            const selectors = {
                 ...common,
                 checkbox: 'td:first-child input[type="checkbox"], .th-checkbox-basic input[type="checkbox"]'
             };
+            console.log('[Linqly] Using Billing page selectors:', selectors);
+            return selectors;
         }
         
         // Tasks page
         if (path.includes('/tasks') || path.includes('#/tasks')) {
-            return {
+            const selectors = {
                 ...common,
                 checkbox: 'td.row-selection-checkbox input[type="checkbox"], .th-checkbox-basic'
             };
+            console.log('[Linqly] Using Tasks page selectors:', selectors);
+            return selectors;
         }
         
-        // Documents page
+        // Documents page - use more comprehensive selectors
         if (path.includes('/documents') || path.includes('#/documents')) {
-            return {
+            const selectors = {
                 ...common,
-                checkbox: 'td.row-selection-checkbox input[type="checkbox"], .th-checkbox',
+                checkbox: 'td.row-selection-checkbox input[type="checkbox"], .th-checkbox, input[type="checkbox"][ng-model], input[type="checkbox"]',
                 isCustomCheckbox: true
             };
+            console.log('[Linqly] Using Documents page selectors:', selectors);
+            return selectors;
         }
         
         // Default for all other pages
-        return {
+        const selectors = {
             ...common,
             checkbox: 'input[type="checkbox"]'
         };
+        console.log('[Linqly] Using default selectors:', selectors);
+        return selectors;
     },
     
     detach() {
@@ -532,6 +665,7 @@ const rowClickSelectFeature = {
         this.currentPath = '';
         this.tableBody = null;
         this.isInitialized = false;
+        this.lastClickedRow = null;
         
         console.log('[Linqly] Row-click feature fully detached');
     }
