@@ -8,6 +8,11 @@ class CommunicationsRowSelector {
     this.isInitialized = false;
     this.observer = null;
     this.initializationAttempts = 0;
+    this.lastClickedRow = null;
+    this.isShiftPressed = false;
+    this.isShiftClickOperation = false;
+    this.boundHandleTableMouseDown = this.handleTableMouseDown.bind(this);
+    this.boundHandleTableMouseUp = this.handleTableMouseUp.bind(this);
   }
 
   init() {
@@ -40,9 +45,13 @@ class CommunicationsRowSelector {
 
     // Remove any existing click handlers to prevent duplicates
     table.removeEventListener('click', this.handleTableClick);
+    table.removeEventListener('mousedown', this.boundHandleTableMouseDown, true);
+    table.removeEventListener('mouseup', this.boundHandleTableMouseUp, true);
     
     // Add new click handler
     table.addEventListener('click', this.handleTableClick);
+    table.addEventListener('mousedown', this.boundHandleTableMouseDown, true);
+    table.addEventListener('mouseup', this.boundHandleTableMouseUp, true);
     console.log('[Linqly] Row click handlers initialized');
     return true;
   }
@@ -132,6 +141,8 @@ class CommunicationsRowSelector {
     const table = document.getElementById('communications_logs_data_table');
     if (table) {
       table.removeEventListener('click', this.handleTableClick);
+      table.removeEventListener('mousedown', this.boundHandleTableMouseDown, true);
+      table.removeEventListener('mouseup', this.boundHandleTableMouseUp, true);
     }
     
     // Remove deselect handlers
@@ -163,44 +174,80 @@ class CommunicationsRowSelector {
       return;
     }
 
-    // Prevent default to avoid any native behavior
-    event.preventDefault();
-    event.stopPropagation();
-    
-    // Toggle the checkbox
-    const newState = !checkbox.checked;
-    
-    // Update the checkbox state
-    checkbox.checked = newState;
-    
-    // For Alpine.js, we need to update the bound model
-    if (window.Alpine) {
-      // Try to find the Alpine component
-      const alpineComponent = window.Alpine.closestDataStack(checkbox)[0];
-      if (alpineComponent) {
-        // If we found an Alpine component, update the selected state
-        if (alpineComponent.selected) {
-          const index = alpineComponent.selected.indexOf(checkbox.value);
-          if (newState && index === -1) {
-            alpineComponent.selected.push(checkbox.value);
-          } else if (!newState && index > -1) {
-            alpineComponent.selected.splice(index, 1);
-          }
-        }
+    // Prevent text selection during shift+click
+    if (event.shiftKey) {
+      event.preventDefault();
+      if (window.getSelection) {
+        const selection = window.getSelection();
+        if (selection.removeAllRanges) selection.removeAllRanges();
+        else if (selection.empty) selection.empty();
       }
     }
-    
-    // Dispatch events to trigger any bound listeners
-    const events = ['change', 'input', 'click'];
-    events.forEach(eventType => {
+
+    // Handle shift-click range selection
+    if (event.shiftKey && this.lastClickedRow) {
+      const table = document.getElementById('communications_logs_data_table');
+      const allRows = Array.from(table.querySelectorAll('tr[tabindex="0"]'));
+      const startIndex = allRows.indexOf(this.lastClickedRow);
+      const endIndex = allRows.indexOf(row);
+      if (startIndex === -1 || endIndex === -1) return;
+      const [rangeStart, rangeEnd] = [Math.min(startIndex, endIndex), Math.max(startIndex, endIndex)];
+      for (let i = rangeStart; i <= rangeEnd; i++) {
+        const currentRow = allRows[i];
+        const cb = currentRow.querySelector('input[type="checkbox"]');
+        if (cb && !cb.checked) {
+          cb.checked = true;
+          if (window.Alpine) {
+            const alpineComponent = window.Alpine.closestDataStack(cb)[0];
+            if (alpineComponent && alpineComponent.selected) {
+              const idx = alpineComponent.selected.indexOf(cb.value);
+              if (idx === -1) alpineComponent.selected.push(cb.value);
+            }
+            if (window.Alpine.flush) window.Alpine.flush();
+          }
+          ['change', 'input', 'click'].forEach(eventType => {
+            const evt = new Event(eventType, { bubbles: true, cancelable: true });
+            cb.dispatchEvent(evt);
+          });
+        }
+      }
+      // Do not update lastClickedRow on shift-click
+      return;
+    }
+
+    // Normal click logic
+    const newState = !checkbox.checked;
+    checkbox.checked = newState;
+    if (window.Alpine) {
+      const alpineComponent = window.Alpine.closestDataStack(checkbox)[0];
+      if (alpineComponent && alpineComponent.selected) {
+        const idx = alpineComponent.selected.indexOf(checkbox.value);
+        if (newState && idx === -1) alpineComponent.selected.push(checkbox.value);
+        else if (!newState && idx > -1) alpineComponent.selected.splice(idx, 1);
+      }
+      if (window.Alpine.flush) window.Alpine.flush();
+    }
+    ['change', 'input', 'click'].forEach(eventType => {
       const evt = new Event(eventType, { bubbles: true, cancelable: true });
       checkbox.dispatchEvent(evt);
     });
-    
-    // Force a re-render if Alpine is present
-    if (window.Alpine && window.Alpine.flush) {
-      window.Alpine.flush();
+    // Update lastClickedRow for future shift-clicks
+    this.lastClickedRow = row;
+  }
+
+  handleTableMouseDown(event) {
+    if (event.shiftKey) {
+      const row = event.target.closest('tr[tabindex="0"]');
+      if (row) {
+        const table = document.getElementById('communications_logs_data_table');
+        if (table) table.classList.add('shift-click-active');
+      }
     }
+  }
+
+  handleTableMouseUp(event) {
+    const table = document.getElementById('communications_logs_data_table');
+    if (table) table.classList.remove('shift-click-active');
   }
 }
 
@@ -220,3 +267,27 @@ if (document.readyState === 'loading') {
 } else {
   if (shouldInitCommunicationsPage()) new CommunicationsRowSelector().init();
 }
+
+// Add CSS for shift-click text selection prevention
+(function addShiftClickCSS() {
+  if (document.getElementById('linqly-comm-shift-click-css')) return;
+  const style = document.createElement('style');
+  style.id = 'linqly-comm-shift-click-css';
+  style.textContent = `
+    #communications_logs_data_table.shift-click-active {
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+    }
+    #communications_logs_data_table.shift-click-active input,
+    #communications_logs_data_table.shift-click-active textarea,
+    #communications_logs_data_table.shift-click-active [contenteditable] {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+    }
+  `;
+  document.head.appendChild(style);
+})();

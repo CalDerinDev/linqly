@@ -17,8 +17,10 @@ const LinqlyMattersPage = {
     /* Check if we should initialize on this page */
     shouldInitialize() {
         const href = window.location.href;
-        // Exclude matter-level subtabs that have their own module (activities, documents, tasks, billing, contacts)
-        const isMatterSpecialSubtab = /\/matters\/[\d\w-]+\/(activities|documents|tasks|bills|contacts)/.test(href);
+        // Exclude matter-level activities subpage
+        const isMatterActivitiesSubtab = /\/matters\/[\d\w-]+\/activities/.test(href);
+        // Exclude other matter-level subtabs that have their own module
+        const isMatterSpecialSubtab = /\/matters\/[\d\w-]+\/(documents|tasks|bills|contacts)/.test(href) || isMatterActivitiesSubtab;
         const shouldInit = (href.includes('/matters') || href.includes('#/matters')) &&
                           !href.includes('/matters/new') &&  // Exclude new matter creation page
                           !href.includes('/matters/edit') && // Exclude edit pages

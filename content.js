@@ -103,6 +103,10 @@ const featureManager = {
                 }
             }
         } catch (error) {
+            if (error && error.message && error.message.includes('Extension context invalidated')) {
+                console.warn('[Linqly] Extension context invalidated. Please reload the page to restore extension functionality.');
+                return;
+            }
             console.error('[Linqly] Error checking extension state for modular pages:', error);
         }
     },
@@ -225,6 +229,11 @@ const featureManager = {
                     console.log('[Linqly] Extension is disabled, skipping modular page initialization');
                 }
             } catch (error) {
+                if (error && error.message && error.message.includes('Extension context invalidated')) {
+                    console.warn('[Linqly] Extension context invalidated. Please reload the page to restore extension functionality.');
+                    this.isProcessingRouteChange = false;
+                    return;
+                }
                 console.error('[Linqly] Error handling modular pages during route change:', error);
             }
             
@@ -335,61 +344,50 @@ const rowClickSelectFeature = {
     handleRouteChange() {
         const newPath = window.location.href;
         const wasOnSupportedPage = this.shouldInitialize();
-        
-        console.log(`[Linqly] Main content script route changed from ${this.currentPath} to ${newPath}`);
-        this.currentPath = newPath;
-        
-        // Check if we're on a supported page now
         const isOnSupportedPage = this.shouldInitialize();
-        
+        console.log(`[Linqly] Route changed from ${this.currentPath} to ${newPath}`);
+        this.currentPath = newPath;
+
         // Always call the feature manager's route change handler first
-        // This ensures modular pages are properly handled during navigation
-        console.log('[Linqly] Calling feature manager route change handler');
         featureManager.handleRouteChange();
-        
-        // If we're leaving a supported page, clean up
-        if (wasOnSupportedPage && !isOnSupportedPage) {
-            console.log('[Linqly] Left supported page, cleaning up');
-            this.detach();
-            return;
-        }
-        
-        // If we're on a supported page, reinitialize if needed
+
         if (isOnSupportedPage) {
-            // Small delay to allow Clio's SPA to finish rendering
-            console.log('[Linqly] On supported page, initializing if needed');
-            setTimeout(() => this.initializeIfNeeded(), 300);
+            // On actionable page: ensure everything is initialized and observer is set up
+            console.log('[Linqly] On actionable page, initializing extension');
+            this.detach(); // Full cleanup before re-init
+            this.cleanupRouteObserver(); // Ensure no duplicate observers
+            setTimeout(() => {
+                this.initialize();
+                this.setupRouteObserver();
+                console.log('[Linqly] Extension initialized on actionable page');
+            }, 300);
         } else {
-            // We're not on a supported page, make sure we're detached
-            console.log('[Linqly] Not on supported page, ensuring detached');
+            // On unactionable page: fully turn off extension and clean up observers
+            console.log('[Linqly] On unactionable page, turning extension off');
             this.detach();
+            this.cleanupRouteObserver();
         }
         this.lastClickedRow = null;
     },
     
     /* Setup route change detection */
     setupRouteObserver() {
+        // Only set up observer if on actionable page
+        if (!this.shouldInitialize()) {
+            console.log('[Linqly] Not on actionable page, not setting up route observer');
+            return;
+        }
         console.log('[Linqly] Setting up route observer');
-        
-        // Clean up any existing observers
         this.cleanupRouteObserver();
-        
-        // Store reference to bound function for removal
         this.boundHandleRouteChange = this.handleRouteChange.bind(this);
-        
-        // Listen for navigation events
         window.addEventListener('hashchange', this.boundHandleRouteChange);
         window.addEventListener('popstate', this.boundHandleRouteChange);
-        
-        // Also observe DOM mutations for route changes
         this.routeObserver = new MutationObserver(() => {
             const path = window.location.href;
             if (path !== this.currentPath) {
                 this.handleRouteChange();
             }
         });
-        
-        // Observe the document for changes
         this.routeObserver.observe(document, {
             childList: true,
             subtree: true
@@ -398,7 +396,6 @@ const rowClickSelectFeature = {
     
     /* Cleanup route observer */
     cleanupRouteObserver() {
-        console.log('[Linqly] Cleaning up route observer');
         if (this.boundHandleRouteChange) {
             window.removeEventListener('hashchange', this.boundHandleRouteChange);
             window.removeEventListener('popstate', this.boundHandleRouteChange);
@@ -408,6 +405,7 @@ const rowClickSelectFeature = {
             this.routeObserver.disconnect();
             this.routeObserver = null;
         }
+        console.log('[Linqly] Cleaned up route observer');
     },
 
     initializeIfNeeded() {
@@ -803,8 +801,8 @@ const rowClickSelectFeature = {
                 
                 // If it has the checked class or ng-not-empty (and not ng-empty), consider it checked
                 return hasCheckedClass || (hasNgNotEmptyClass && !hasNgEmptyClass);
-                        }
-                    } else {
+            }
+        } else {
             // For regular checkboxes, use the checked property
             return checkbox.checked;
         }
@@ -850,9 +848,9 @@ const rowClickSelectFeature = {
             console.log('[Linqly] ng-click attribute:', ngClickAttr);
             
             // First, try to trigger the click handler that Clio expects
-                        if (typeof checkbox.click === 'function') {
+            if (typeof checkbox.click === 'function') {
                 console.log('[Linqly] Calling checkbox.click()');
-                            checkbox.click();
+                checkbox.click();
             }
             
             // Also try to trigger the ng-click handler directly
@@ -937,14 +935,14 @@ const rowClickSelectFeature = {
             }
             
             // Dispatch click event to trigger Angular handlers
-                            const clickEvent = new MouseEvent('click', {
-                                view: window,
-                                bubbles: true,
+            const clickEvent = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
                 cancelable: true,
                 button: 0,
                 buttons: 1
-                            });
-                            checkbox.dispatchEvent(clickEvent);
+            });
+            checkbox.dispatchEvent(clickEvent);
             
             // Also try clicking the parent row to trigger row selection
             const parentRow = checkbox.closest('tr');
@@ -960,10 +958,10 @@ const rowClickSelectFeature = {
                 console.log('[Linqly] Final aria-checked:', checkbox.getAttribute('aria-checked'));
                 console.log('[Linqly] Final CSS classes:', checkbox.className);
             }, 100);
-                    
-                    return;
-                }
-                
+            
+            return;
+        }
+        
         // For regular checkboxes, use the existing logic
         // For shift-click range selection, always set to true regardless of current state
         // This ensures all rows in the range are selected, even if some were already selected
@@ -973,9 +971,9 @@ const rowClickSelectFeature = {
             // Don't return early - still process the checkbox to ensure it stays selected
         } else if (currentState === newState) {
             console.log('[Linqly] Checkbox already in desired state, skipping change');
-                    return;
-                }
-                
+            return;
+        }
+        
         console.log('[Linqly] Changing checkbox state from', currentState, 'to', newState);
         
         // Set the checkbox state
@@ -999,48 +997,48 @@ const rowClickSelectFeature = {
             }
         } else {
             // For other pages - try multiple approaches to ensure the checkbox toggles
-                if (typeof checkbox.click === 'function') {
-                    checkbox.click();
-                }
-                
+            if (typeof checkbox.click === 'function') {
+                checkbox.click();
+            }
+            
             // Dispatch a click event with all necessary properties
-                const clickEvent = new MouseEvent('click', {
-                    view: window,
-                    bubbles: true,
-                    cancelable: true,
-                    button: 0,
-                    buttons: 1,
-                    clientX: 0,
-                    clientY: 0
-                });
-                
-                Object.defineProperties(clickEvent, {
-                    target: { value: checkbox },
-                    currentTarget: { value: checkbox },
-                    srcElement: { value: checkbox },
-                    composed: { value: true }
-                });
-                
-                checkbox.dispatchEvent(clickEvent);
-                
+            const clickEvent = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true,
+                button: 0,
+                buttons: 1,
+                clientX: 0,
+                clientY: 0
+            });
+            
+            Object.defineProperties(clickEvent, {
+                target: { value: checkbox },
+                currentTarget: { value: checkbox },
+                srcElement: { value: checkbox },
+                composed: { value: true }
+            });
+            
+            checkbox.dispatchEvent(clickEvent);
+            
             // Also dispatch change and input events
-                setTimeout(() => {
-                    checkbox.checked = newState;
-                    
-                    ['change', 'input'].forEach(eventType => {
-                        const evt = new Event(eventType, { 
-                            bubbles: true, 
-                            cancelable: true,
-                            view: window
-                        });
-                        checkbox.dispatchEvent(evt);
+            setTimeout(() => {
+                checkbox.checked = newState;
+                
+                ['change', 'input'].forEach(eventType => {
+                    const evt = new Event(eventType, { 
+                        bubbles: true, 
+                        cancelable: true,
+                        view: window
                     });
-                    
-                    // Try clicking the row if it's a Kendo UI row
-                    if (row && (row.classList.contains('k-master-row') || row.classList.contains('k-grid-edit-row'))) {
-                        row.click();
-                    }
-                }, 10);
+                    checkbox.dispatchEvent(evt);
+                });
+                
+                // Try clicking the row if it's a Kendo UI row
+                if (row && (row.classList.contains('k-master-row') || row.classList.contains('k-grid-edit-row'))) {
+                    row.click();
+                }
+            }, 10);
         }
     },
 
@@ -1111,31 +1109,21 @@ const rowClickSelectFeature = {
     
     detach() {
         console.log('[Linqly] Detaching row-click feature');
-        
-        // Clean up click listener
         if (this.listener) {
             this.listener();
             this.listener = null;
         }
-        
-        // Clean up mouse event listeners
         this.removeMouseEventListeners();
-        
-        // Remove the CSS we added
         this.removeTextSelectionPreventionCSS();
-        
-        // Don't clean up route observer - keep it active to detect route changes for modular pages
-        // this.cleanupRouteObserver();
-        
-        // Reset current path to ensure reinitialization works correctly
         this.currentPath = '';
         this.tableBody = null;
         this.isInitialized = false;
         this.lastClickedRow = null;
         this.isShiftPressed = false;
         this.isShiftClickOperation = false;
-        
-        console.log('[Linqly] Row-click feature fully detached');
+        document.querySelectorAll('.shift-click-active').forEach(el => el.classList.remove('shift-click-active'));
+        this.cleanupRouteObserver(); // Always clean up observer on detach
+        console.log('[Linqly] Row-click feature fully detached (idempotent)');
     },
 
     addTextSelectionPreventionCSS() {
