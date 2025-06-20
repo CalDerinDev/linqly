@@ -16,7 +16,7 @@ const featureManager = {
         }
     },
     
-    init() {
+    async init() {
         this.features.forEach(feature => {
             try {
                 if (!feature.shouldInitialize || feature.shouldInitialize()) {
@@ -26,6 +26,85 @@ const featureManager = {
                 console.error(`Error initialising feature: ${feature.name}`, err);
             }
         });
+        
+        // Initialize modular page modules if available
+        await this.initModularPages();
+    },
+    
+    async initModularPages() {
+        // Check if extension is enabled before initializing modular pages
+        try {
+            const res = await new Promise((resolve) => {
+                chrome.storage.sync.get({ linqly_enabled: true }, resolve);
+            });
+            
+            if (!res.linqly_enabled) {
+                console.log('[Linqly] Extension disabled, skipping modular page initialization');
+                return;
+            }
+            
+            // Initialize Matters page module if available and on Matters page
+            if (window.LinqlyMattersPage && window.LinqlyMattersPage.shouldInitialize()) {
+                try {
+                    console.log('[Linqly] Initializing modular Matters page');
+                    window.LinqlyMattersPage.initialize();
+                } catch (err) {
+                    console.error('[Linqly] Error initializing modular Matters page:', err);
+                }
+            }
+            
+            // Initialize Contacts page module if available and on Contacts page
+            if (window.LinqlyContactsPage && window.LinqlyContactsPage.shouldInitialize()) {
+                try {
+                    console.log('[Linqly] Initializing modular Contacts page');
+                    window.LinqlyContactsPage.initialize();
+                } catch (err) {
+                    console.error('[Linqly] Error initializing modular Contacts page:', err);
+                }
+            }
+            
+            // Initialize Tasks page module if available and on Tasks page
+            if (window.LinqlyTasksPage && window.LinqlyTasksPage.shouldInitialize()) {
+                try {
+                    console.log('[Linqly] Initializing modular Tasks page');
+                    window.LinqlyTasksPage.initialize();
+                } catch (err) {
+                    console.error('[Linqly] Error initializing modular Tasks page:', err);
+                }
+            }
+            
+            // Initialize Activities page module if available and on Activities page
+            if (window.LinqlyActivitiesPage && window.LinqlyActivitiesPage.shouldInitialize()) {
+                try {
+                    console.log('[Linqly] Initializing modular Activities page');
+                    window.LinqlyActivitiesPage.initialize();
+                } catch (err) {
+                    console.error('[Linqly] Error initializing modular Activities page:', err);
+                }
+            }
+            
+            // Initialize Documents page module if available and on Documents page
+            if (window.LinqlyDocumentsPage && window.LinqlyDocumentsPage.shouldInitialize()) {
+                try {
+                    console.log('[Linqly] Initializing modular Documents page');
+                    window.LinqlyDocumentsPage.initialize();
+                } catch (err) {
+                    console.error('[Linqly] Error initializing modular Documents page:', err);
+                }
+            }
+            
+            // Initialize Billing page module if available and on Billing page
+            if (window.LinqlyBillingPage && window.LinqlyBillingPage.shouldInitialize()) {
+                try {
+                    console.log('[Linqly] Initializing modular Billing page');
+                    window.LinqlyBillingPage.initialize();
+                } catch (err) {
+                    console.error('[Linqly] Error initializing modular Billing page:', err);
+                }
+            }
+        } catch (error) {
+            console.error('[Linqly] Error checking extension state for modular pages:', error);
+        }
     },
     
     handleRouteChange() {
@@ -41,9 +120,9 @@ const featureManager = {
         }
         
         // Debounce route changes to prevent excessive reinitialization
-        this.routeChangeTimeout = setTimeout(() => {
+        this.routeChangeTimeout = setTimeout(async () => {
             this.isProcessingRouteChange = true;
-            console.log('[Linqly] Processing route change...');
+            console.log('[Linqly] Processing route change in feature manager...');
             
             this.features.forEach(feature => {
                 try {
@@ -73,6 +152,82 @@ const featureManager = {
                 }
             });
             
+            // Handle modular page modules during route changes
+            console.log('[Linqly] Checking modular pages for route change...');
+            try {
+                const res = await new Promise((resolve) => {
+                    chrome.storage.sync.get({ linqly_enabled: true }, resolve);
+                });
+                
+                if (res.linqly_enabled) {
+                    console.log('[Linqly] Extension is enabled, checking modular pages...');
+                    
+                    // Check and initialize Matters page if needed
+                    if (window.LinqlyMattersPage) {
+                        const shouldInitMatters = window.LinqlyMattersPage.shouldInitialize();
+                        console.log('[Linqly] Matters page should initialize?', shouldInitMatters);
+                        if (shouldInitMatters) {
+                            console.log('[Linqly] Route change: Initializing modular Matters page');
+                            window.LinqlyMattersPage.initialize();
+                        }
+                    }
+                    
+                    // Check and initialize Contacts page if needed
+                    if (window.LinqlyContactsPage) {
+                        const shouldInitContacts = window.LinqlyContactsPage.shouldInitialize();
+                        console.log('[Linqly] Contacts page should initialize?', shouldInitContacts);
+                        if (shouldInitContacts) {
+                            console.log('[Linqly] Route change: Initializing modular Contacts page');
+                            window.LinqlyContactsPage.initialize();
+                        }
+                    }
+                    
+                    // Check and initialize Tasks page if needed
+                    if (window.LinqlyTasksPage) {
+                        const shouldInitTasks = window.LinqlyTasksPage.shouldInitialize();
+                        console.log('[Linqly] Tasks page should initialize?', shouldInitTasks);
+                        if (shouldInitTasks) {
+                            console.log('[Linqly] Route change: Initializing modular Tasks page');
+                            window.LinqlyTasksPage.initialize();
+                        }
+                    }
+                    
+                    // Check and initialize Activities page if needed
+                    if (window.LinqlyActivitiesPage) {
+                        const shouldInitActivities = window.LinqlyActivitiesPage.shouldInitialize();
+                        console.log('[Linqly] Activities page should initialize?', shouldInitActivities);
+                        if (shouldInitActivities) {
+                            console.log('[Linqly] Route change: Initializing modular Activities page');
+                            window.LinqlyActivitiesPage.initialize();
+                        }
+                    }
+                    
+                    // Check and initialize Documents page if needed
+                    if (window.LinqlyDocumentsPage) {
+                        const shouldInitDocuments = window.LinqlyDocumentsPage.shouldInitialize();
+                        console.log('[Linqly] Documents page should initialize?', shouldInitDocuments);
+                        if (shouldInitDocuments) {
+                            console.log('[Linqly] Route change: Initializing modular Documents page');
+                            window.LinqlyDocumentsPage.initialize();
+                        }
+                    }
+                    
+                    // Check and initialize Billing page if needed
+                    if (window.LinqlyBillingPage) {
+                        const shouldInitBilling = window.LinqlyBillingPage.shouldInitialize();
+                        console.log('[Linqly] Billing page should initialize?', shouldInitBilling);
+                        if (shouldInitBilling) {
+                            console.log('[Linqly] Route change: Initializing modular Billing page');
+                            window.LinqlyBillingPage.initialize();
+                        }
+                    }
+                } else {
+                    console.log('[Linqly] Extension is disabled, skipping modular page initialization');
+                }
+            } catch (error) {
+                console.error('[Linqly] Error handling modular pages during route change:', error);
+            }
+            
             this.isProcessingRouteChange = false;
         }, 100); // 100ms debounce
     }
@@ -92,13 +247,81 @@ const rowClickSelectFeature = {
     /* Run on Clio dashboard and specific pages */
     shouldInitialize() {
         const href = window.location.href;
+        
+        // Check if we're on the Matters page and have the modular module available
+        if ((href.includes('/matters') || href.includes('#/matters')) && 
+            !href.includes('/matters/new') && 
+            !href.includes('/matters/edit') && 
+            !href.includes('/matters/create') &&
+            window.LinqlyMattersPage) {
+            console.log('[Linqly] Matters page detected, using modular approach');
+            return false; // Don't initialize the main feature, let the modular one handle it
+        }
+        
+        // Check if we're on the Contacts page and have the modular module available
+        if ((href.includes('/contacts') || href.includes('#/contacts')) && 
+            !href.includes('/contacts/new') && 
+            !href.includes('/contacts/edit') && 
+            !href.includes('/contacts/create') &&
+            window.LinqlyContactsPage) {
+            console.log('[Linqly] Contacts page detected, using modular approach');
+            return false; // Don't initialize the main feature, let the modular one handle it
+        }
+        
+        // Check if we're on the Tasks page and have the modular module available
+        if ((href.includes('/tasks') || href.includes('#/tasks')) && 
+            !href.includes('/tasks/new') && 
+            !href.includes('/tasks/edit') && 
+            !href.includes('/tasks/create') &&
+            window.LinqlyTasksPage) {
+            console.log('[Linqly] Tasks page detected, using modular approach');
+            return false; // Don't initialize the main feature, let the modular one handle it
+        }
+        
+        // Check if we're on the Activities page and have the modular module available
+        if ((href.includes('/activities') || href.includes('#/activities')) && 
+            !href.includes('/activities/new') && 
+            !href.includes('/activities/edit') && 
+            !href.includes('/activities/create') &&
+            window.LinqlyActivitiesPage) {
+            console.log('[Linqly] Activities page detected, using modular approach');
+            return false; // Don't initialize the main feature, let the modular one handle it
+        }
+        
+        // Check if we're on the new bills page (handled by modular approach)
+        if (href.includes('/bills/new_bills')) {
+            console.log('[Linqly] New bills page detected, using modular approach');
+            return false; // Don't initialize the main feature, let the modular one handle it
+        }
+        
+        // Check if we're on the Billing page and have the modular module available
+        if ((href.includes('/bills') || href.includes('#/bills')) && 
+            !href.includes('/bills/new') && 
+            !href.includes('/bills/edit') && 
+            !href.includes('/bills/create') &&
+            !href.includes('/bills/new_bills') &&
+            window.LinqlyBillingPage) {
+            console.log('[Linqly] Billing page detected, using modular approach');
+            return false; // Don't initialize the main feature, let the modular one handle it
+        }
+        
+        // Check if we're on the Documents page and have the modular module available
+        if ((href.includes('/documents') || href.includes('#/documents')) && 
+            !href.includes('/documents/new') && 
+            !href.includes('/documents/edit') && 
+            !href.includes('/documents/create') &&
+            window.LinqlyDocumentsPage) {
+            console.log('[Linqly] Documents page detected, using modular approach');
+            return false; // Don't initialize the main feature, let the modular one handle it
+        }
+        
         // Match root dashboard or specific sections
         const shouldInit = 
             /^https:\/\/app\.clio\.com\/nc\/#\//.test(href) &&  // Root dashboard
             !/\/(login|auth|sign_in|sign_up|password|billing)/.test(href) &&  // Exclude auth pages
-            !href.includes('/bills/new_bills') &&  // Exclude new bills page (handled by newbills.js)
             !href.includes('/matters/new') &&  // Exclude new matter creation page
             !href.includes('/contacts/new') &&  // Exclude new contact creation page
+            !href.includes('/tasks/new') &&  // Exclude new task creation page
             !href.includes('/settings/') &&  // Exclude settings pages
             !href.includes('/new') &&  // Exclude any other new creation pages
             !href.includes('/edit') &&  // Exclude edit pages
@@ -113,13 +336,15 @@ const rowClickSelectFeature = {
         const newPath = window.location.href;
         const wasOnSupportedPage = this.shouldInitialize();
         
-        console.log(`[Linqly] Route changed from ${this.currentPath} to ${newPath}`);
+        console.log(`[Linqly] Main content script route changed from ${this.currentPath} to ${newPath}`);
         this.currentPath = newPath;
         
         // Check if we're on a supported page now
         const isOnSupportedPage = this.shouldInitialize();
         
-        // Always call the feature manager's route change handler
+        // Always call the feature manager's route change handler first
+        // This ensures modular pages are properly handled during navigation
+        console.log('[Linqly] Calling feature manager route change handler');
         featureManager.handleRouteChange();
         
         // If we're leaving a supported page, clean up
@@ -219,9 +444,15 @@ const rowClickSelectFeature = {
         // Clean up any existing listeners first
         this.detach();
         
-        // Setup route change detection if not already done
+        // Always setup route change detection - this is needed for modular pages
         if (!this.routeObserver) {
             this.setupRouteObserver();
+        }
+        
+        // Only proceed with the rest if we should initialize on this page
+        if (!this.shouldInitialize()) {
+            console.log('[Linqly] Not initializing main feature - using modular approach');
+            return;
         }
         
         // Add CSS to prevent text selection during shift+click
@@ -572,8 +803,8 @@ const rowClickSelectFeature = {
                 
                 // If it has the checked class or ng-not-empty (and not ng-empty), consider it checked
                 return hasCheckedClass || (hasNgNotEmptyClass && !hasNgEmptyClass);
-            }
-        } else {
+                        }
+                    } else {
             // For regular checkboxes, use the checked property
             return checkbox.checked;
         }
@@ -619,9 +850,9 @@ const rowClickSelectFeature = {
             console.log('[Linqly] ng-click attribute:', ngClickAttr);
             
             // First, try to trigger the click handler that Clio expects
-            if (typeof checkbox.click === 'function') {
+                        if (typeof checkbox.click === 'function') {
                 console.log('[Linqly] Calling checkbox.click()');
-                checkbox.click();
+                            checkbox.click();
             }
             
             // Also try to trigger the ng-click handler directly
@@ -706,14 +937,14 @@ const rowClickSelectFeature = {
             }
             
             // Dispatch click event to trigger Angular handlers
-            const clickEvent = new MouseEvent('click', {
-                view: window,
-                bubbles: true,
+                            const clickEvent = new MouseEvent('click', {
+                                view: window,
+                                bubbles: true,
                 cancelable: true,
                 button: 0,
                 buttons: 1
-            });
-            checkbox.dispatchEvent(clickEvent);
+                            });
+                            checkbox.dispatchEvent(clickEvent);
             
             // Also try clicking the parent row to trigger row selection
             const parentRow = checkbox.closest('tr');
@@ -729,10 +960,10 @@ const rowClickSelectFeature = {
                 console.log('[Linqly] Final aria-checked:', checkbox.getAttribute('aria-checked'));
                 console.log('[Linqly] Final CSS classes:', checkbox.className);
             }, 100);
-            
-            return;
-        }
-        
+                    
+                    return;
+                }
+                
         // For regular checkboxes, use the existing logic
         // For shift-click range selection, always set to true regardless of current state
         // This ensures all rows in the range are selected, even if some were already selected
@@ -742,9 +973,9 @@ const rowClickSelectFeature = {
             // Don't return early - still process the checkbox to ensure it stays selected
         } else if (currentState === newState) {
             console.log('[Linqly] Checkbox already in desired state, skipping change');
-            return;
-        }
-
+                    return;
+                }
+                
         console.log('[Linqly] Changing checkbox state from', currentState, 'to', newState);
         
         // Set the checkbox state
@@ -768,48 +999,48 @@ const rowClickSelectFeature = {
             }
         } else {
             // For other pages - try multiple approaches to ensure the checkbox toggles
-            if (typeof checkbox.click === 'function') {
-                checkbox.click();
-            }
-            
-            // Dispatch a click event with all necessary properties
-            const clickEvent = new MouseEvent('click', {
-                view: window,
-                bubbles: true,
-                cancelable: true,
-                button: 0,
-                buttons: 1,
-                clientX: 0,
-                clientY: 0
-            });
-            
-            Object.defineProperties(clickEvent, {
-                target: { value: checkbox },
-                currentTarget: { value: checkbox },
-                srcElement: { value: checkbox },
-                composed: { value: true }
-            });
-            
-            checkbox.dispatchEvent(clickEvent);
-            
-            // Also dispatch change and input events
-            setTimeout(() => {
-                checkbox.checked = newState;
+                if (typeof checkbox.click === 'function') {
+                    checkbox.click();
+                }
                 
-                ['change', 'input'].forEach(eventType => {
-                    const evt = new Event(eventType, { 
-                        bubbles: true, 
-                        cancelable: true,
-                        view: window
-                    });
-                    checkbox.dispatchEvent(evt);
+            // Dispatch a click event with all necessary properties
+                const clickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true,
+                    button: 0,
+                    buttons: 1,
+                    clientX: 0,
+                    clientY: 0
                 });
                 
-                // Try clicking the row if it's a Kendo UI row
-                if (row && (row.classList.contains('k-master-row') || row.classList.contains('k-grid-edit-row'))) {
-                    row.click();
-                }
-            }, 10);
+                Object.defineProperties(clickEvent, {
+                    target: { value: checkbox },
+                    currentTarget: { value: checkbox },
+                    srcElement: { value: checkbox },
+                    composed: { value: true }
+                });
+                
+                checkbox.dispatchEvent(clickEvent);
+                
+            // Also dispatch change and input events
+                setTimeout(() => {
+                    checkbox.checked = newState;
+                    
+                    ['change', 'input'].forEach(eventType => {
+                        const evt = new Event(eventType, { 
+                            bubbles: true, 
+                            cancelable: true,
+                            view: window
+                        });
+                        checkbox.dispatchEvent(evt);
+                    });
+                    
+                    // Try clicking the row if it's a Kendo UI row
+                    if (row && (row.classList.contains('k-master-row') || row.classList.contains('k-grid-edit-row'))) {
+                        row.click();
+                    }
+                }, 10);
         }
     },
 
@@ -893,7 +1124,7 @@ const rowClickSelectFeature = {
         // Remove the CSS we added
         this.removeTextSelectionPreventionCSS();
         
-        // Don't clean up route observer - keep it active to detect route changes
+        // Don't clean up route observer - keep it active to detect route changes for modular pages
         // this.cleanupRouteObserver();
         
         // Reset current path to ensure reinitialization works correctly
@@ -902,6 +1133,7 @@ const rowClickSelectFeature = {
         this.isInitialized = false;
         this.lastClickedRow = null;
         this.isShiftPressed = false;
+        this.isShiftClickOperation = false;
         
         console.log('[Linqly] Row-click feature fully detached');
     },
@@ -915,37 +1147,7 @@ const rowClickSelectFeature = {
         const style = document.createElement('style');
         style.id = 'linqly-text-selection-prevention';
         style.textContent = `
-            /* Prevent text selection during shift+click operations */
-            .k-grid-content,
-            .k-grid-table-wrap,
-            [kendo-grid],
-            .cc-tree-view {
-                -webkit-user-select: none;
-                -moz-user-select: none;
-                -ms-user-select: none;
-                user-select: none;
-            }
-            
-            /* Allow text selection in specific elements that should remain selectable */
-            .k-grid-content input,
-            .k-grid-content textarea,
-            .k-grid-content [contenteditable],
-            .k-grid-table-wrap input,
-            .k-grid-table-wrap textarea,
-            .k-grid-table-wrap [contenteditable],
-            [kendo-grid] input,
-            [kendo-grid] textarea,
-            [kendo-grid] [contenteditable],
-            .cc-tree-view input,
-            .cc-tree-view textarea,
-            .cc-tree-view [contenteditable] {
-                -webkit-user-select: text;
-                -moz-user-select: text;
-                -ms-user-select: text;
-                user-select: text;
-            }
-            
-            /* Prevent text selection specifically during shift+click */
+            /* Only prevent text selection during shift+click operations */
             .k-grid-content.shift-click-active,
             .k-grid-table-wrap.shift-click-active,
             [kendo-grid].shift-click-active,
@@ -955,10 +1157,29 @@ const rowClickSelectFeature = {
                 -ms-user-select: none !important;
                 user-select: none !important;
             }
+            
+            /* Allow text selection in interactive elements even during shift+click */
+            .k-grid-content.shift-click-active input,
+            .k-grid-content.shift-click-active textarea,
+            .k-grid-content.shift-click-active [contenteditable],
+            .k-grid-table-wrap.shift-click-active input,
+            .k-grid-table-wrap.shift-click-active textarea,
+            .k-grid-table-wrap.shift-click-active [contenteditable],
+            [kendo-grid].shift-click-active input,
+            [kendo-grid].shift-click-active textarea,
+            [kendo-grid].shift-click-active [contenteditable],
+            .cc-tree-view.shift-click-active input,
+            .cc-tree-view.shift-click-active textarea,
+            .cc-tree-view.shift-click-active [contenteditable] {
+                -webkit-user-select: text !important;
+                -moz-user-select: text !important;
+                -ms-user-select: text !important;
+                user-select: text !important;
+            }
         `;
         
         document.head.appendChild(style);
-        console.log('[Linqly] Added text selection prevention CSS');
+        console.log('[Linqly] Added text selection prevention CSS (shift+click only)');
     },
 
     removeTextSelectionPreventionCSS() {
@@ -988,23 +1209,30 @@ const rowClickSelectFeature = {
     },
 
     handleMouseDown(event) {
-        // If shift key is pressed, prevent text selection
+        // Only prevent text selection if shift is pressed and we're clicking on a row
         if (event.shiftKey) {
-            event.preventDefault();
-            this.isShiftPressed = true;
+            const selectors = this.getSelectors();
+            const row = event.target.closest(selectors.row);
+            if (row) {
+                // We're doing a shift+click on a row, prevent text selection
+                event.preventDefault();
+                this.isShiftPressed = true;
+                this.isShiftClickOperation = true;
+            }
         }
     },
 
     handleMouseMove(event) {
-        // If shift is pressed and mouse is moving, prevent text selection
-        if (this.isShiftPressed) {
+        // Only prevent text selection if we're in the middle of a shift+click operation
+        if (this.isShiftClickOperation) {
             event.preventDefault();
         }
     },
 
     handleMouseUp(event) {
-        // Clear shift pressed state
+        // Clear shift operation state
         this.isShiftPressed = false;
+        this.isShiftClickOperation = false;
     },
 
     handleKeyDown(event) {
@@ -1018,6 +1246,7 @@ const rowClickSelectFeature = {
         // Clear shift key state
         if (event.key === 'Shift') {
             this.isShiftPressed = false;
+            this.isShiftClickOperation = false;
         }
     },
 
@@ -1157,271 +1386,15 @@ const checkboxDeselectFeature = {
     }
 };
 
-/**************** Feature: New Bills Page **************/
-const newBillsPageFeature = {
-    name: 'New Bills Page',
-    
-    isInitialized: false,
-    observer: null,
-    listener: null,
-    
-    shouldInitialize() {
-        const href = window.location.href;
-        const shouldInit = href.includes('/bills/new_bills');
-        console.log(`[Linqly] Should initialize New Bills Page for ${href}?`, shouldInit);
-        return shouldInit;
-    },
-    
-    initialize() {
-        if (this.isInitialized) return;
-        
-        console.log('[Linqly] Initializing New Bills Page feature');
-        
-        // Bind methods to maintain correct 'this' context
-        this.boundHandleTableClick = this.handleTableClick.bind(this);
-        this.boundHandleKeydown = this.handleKeydown.bind(this);
-        this.boundHandlePageClick = this.handlePageClick.bind(this);
-        
-        // Setup initial handlers
-        this.setupTableHandlers();
-        this.setupDeselectHandlers();
-        this.setupRouteObserver();
-        
-        this.isInitialized = true;
-    },
-    
-    setupTableHandlers() {
-        const table = document.querySelector('.cc-tree-view');
-        if (table) {
-            console.log('[Linqly] Found new bills table, setting up handlers');
-            table.addEventListener('click', this.boundHandleTableClick);
-            return true;
-        }
-        return false;
-    },
-    
-    setupDeselectHandlers() {
-        // Add event listeners
-        document.addEventListener('keydown', this.boundHandleKeydown);
-        document.addEventListener('click', this.boundHandlePageClick, true);
-        
-        console.log('[Linqly] New Bills Page deselect handlers initialized');
-        console.log('[Linqly] ESC key listener attached:', !!this.boundHandleKeydown);
-        console.log('[Linqly] Click outside listener attached:', !!this.boundHandlePageClick);
-    },
-    
-    setupRouteObserver() {
-        // Target the main content area that changes during SPA navigation
-        const targetNode = document.querySelector('body');
-        if (!targetNode) return;
-        
-        // Disconnect any existing observer
-        if (this.observer) {
-            this.observer.disconnect();
-        }
-        
-        // Create an observer instance
-        this.observer = new MutationObserver((mutations) => {
-            // Check if the new bills table is now in the DOM
-            const table = document.querySelector('.cc-tree-view');
-            if (table) {
-                console.log('[Linqly] Detected route change to new bills page');
-                this.setupTableHandlers();
-            }
-        });
-        
-        // Start observing the target node for configured mutations
-        this.observer.observe(targetNode, {
-            childList: true,
-            subtree: true
-        });
-        
-        console.log('[Linqly] New Bills Page route observer initialized');
-    },
-    
-    handleTableClick(event) {
-        // Find the closest row
-        const row = event.target.closest('tr.cc-tree-view-item, tr.cc-tree-view-subitem');
-        if (!row) return;
-
-        // Find the checkbox within this row
-        const checkbox = row.querySelector('input[type="checkbox"]');
-        if (!checkbox) return;
-
-        // Don't interfere with direct checkbox clicks or interactive elements
-        // Check if the click is directly on the checkbox, its label, or the checkbox container
-        const isDirectCheckboxClick = event.target === checkbox || 
-                                     event.target.closest('input[type="checkbox"]') === checkbox ||
-                                     event.target.closest('.th-checkbox') === checkbox.closest('.th-checkbox') ||
-                                     event.target.closest('label') ||
-                                     event.target.closest('a, button, [role="button"], .th-icon-button');
-        
-        if (isDirectCheckboxClick) {
-            console.log('[Linqly] Direct checkbox click detected, not interfering');
-            return;
-        }
-
-        console.log('[Linqly] Toggling checkbox on new bills page');
-        
-        // Determine if this is a parent (client) or child (matter) row
-        const isParentRow = row.classList.contains('cc-tree-view-item');
-        const isChildRow = row.classList.contains('cc-tree-view-subitem');
-        
-        // For tree selection, we need to handle parent/child relationships
-        if (isParentRow) {
-            // Clicking parent row - ensure parent checkbox gets checked and let Clio handle children
-            const currentState = checkbox.checked;
-            const newState = !currentState;
-            
-            // Update the parent checkbox state
-            checkbox.checked = newState;
-            
-            // Dispatch events to notify Angular
-            ['change', 'input'].forEach(eventType => {
-                const evt = new Event(eventType, { 
-                    bubbles: true, 
-                    cancelable: true 
-                });
-                checkbox.dispatchEvent(evt);
-            });
-            
-            // Let Clio's native tree selection handle the children
-            // The parent checkbox click should trigger Clio's logic to select/deselect all children
-            if (typeof checkbox.click === 'function') {
-                setTimeout(() => {
-                    checkbox.click();
-                }, 10);
-            }
-        } else if (isChildRow) {
-            // Clicking child row - use the same approach as parent but without the additional click
-            const currentState = checkbox.checked;
-            const newState = !currentState;
-            
-            // Update the checkbox state directly
-            checkbox.checked = newState;
-            
-            // Dispatch events to notify Angular
-            ['change', 'input'].forEach(eventType => {
-                const evt = new Event(eventType, { 
-                    bubbles: true, 
-                    cancelable: true 
-                });
-                checkbox.dispatchEvent(evt);
-            });
-            
-            // For child rows, also try clicking the checkbox to ensure Clio's logic is triggered
-            if (typeof checkbox.click === 'function') {
-                setTimeout(() => {
-                    checkbox.click();
-                }, 10);
-            }
-        }
-    },
-    
-    deselectAll() {
-        // For new bills page, manually uncheck all checkboxes since there's no clear selection button
-        const checkboxes = document.querySelectorAll('.cc-tree-view input[type="checkbox"]:checked');
-        
-        console.log('[Linqly] DeselectAll called, found checkboxes:', checkboxes.length);
-        
-        if (checkboxes.length > 0) {
-            console.log(`[Linqly] Manually unchecking ${checkboxes.length} checkboxes on new bills page`);
-            
-            checkboxes.forEach((checkbox, index) => {
-                console.log(`[Linqly] Unchecking checkbox ${index + 1}:`, checkbox);
-                
-                // Uncheck the checkbox
-                checkbox.checked = false;
-                
-                // Dispatch change and input events to notify Angular
-                ['change', 'input'].forEach(eventType => {
-                    const evt = new Event(eventType, { 
-                        bubbles: true, 
-                        cancelable: true 
-                    });
-                    checkbox.dispatchEvent(evt);
-                });
-                
-                // Also try clicking the checkbox to ensure Clio's logic is triggered
-                if (typeof checkbox.click === 'function') {
-                    setTimeout(() => {
-                        checkbox.click();
-                    }, 10);
-                }
-            });
-        } else {
-            console.log('[Linqly] No checkboxes to deselect on new bills page');
-        }
-    },
-    
-    handleKeydown(event) {
-        if (event.key === 'Escape') {
-            this.deselectAll();
-        }
-    },
-    
-    handlePageClick(event) {
-        const target = event.target;
-        
-        // Exit if the user clicked on a link, button, or an icon within a button
-        if (target.closest('a, button, [role="button"]')) {
-            return;
-        }
-        
-        // Find the new bills table
-        const newBillsTable = document.querySelector('.cc-tree-view');
-        
-        // If we clicked outside the new bills table area, deselect all
-        if (newBillsTable && !target.closest('.cc-tree-view')) {
-            this.deselectAll();
-        }
-    },
-    
-    detach() {
-        if (!this.isInitialized) return;
-        
-        console.log('[Linqly] Detaching New Bills Page feature');
-        
-        // Remove table click handler
-        const table = document.querySelector('.cc-tree-view');
-        if (table) {
-            table.removeEventListener('click', this.boundHandleTableClick);
-        }
-        
-        // Remove deselect handlers
-        if (this.boundHandleKeydown) {
-            document.removeEventListener('keydown', this.boundHandleKeydown);
-        }
-        if (this.boundHandlePageClick) {
-            document.removeEventListener('click', this.boundHandlePageClick, true);
-        }
-        
-        // Clean up observer
-        if (this.observer) {
-            this.observer.disconnect();
-            this.observer = null;
-        }
-        
-        // Reset bound methods
-        this.boundHandleTableClick = null;
-        this.boundHandleKeydown = null;
-        this.boundHandlePageClick = null;
-        
-        this.isInitialized = false;
-        console.log('[Linqly] New Bills Page feature fully detached');
-    }
-};
-
 /************************ Initialise *******************************/
 // Register features
 featureManager.register(rowClickSelectFeature);
 featureManager.register(checkboxDeselectFeature);
-featureManager.register(newBillsPageFeature);
 
 // Helper to (de)activate features based on stored setting
-function applyEnabledState(enabled) {
+async function applyEnabledState(enabled) {
     if (enabled) {
-        featureManager.init();
+        await featureManager.init();
     } else {
         // Detach logic for each feature that supports detach
         if (typeof rowClickSelectFeature.detach === 'function') {
@@ -1432,18 +1405,41 @@ function applyEnabledState(enabled) {
         if (typeof checkboxDeselectFeature.detach === 'function') {
             checkboxDeselectFeature.detach();
         }
-        if (typeof newBillsPageFeature.detach === 'function') {
-            newBillsPageFeature.detach();
+        
+        // Also detach modular page modules
+        if (window.LinqlyMattersPage && typeof window.LinqlyMattersPage.detach === 'function') {
+            console.log('[Linqly] Detaching modular Matters page due to extension disable');
+            window.LinqlyMattersPage.detach();
+        }
+        if (window.LinqlyContactsPage && typeof window.LinqlyContactsPage.detach === 'function') {
+            console.log('[Linqly] Detaching modular Contacts page due to extension disable');
+            window.LinqlyContactsPage.detach();
+        }
+        if (window.LinqlyTasksPage && typeof window.LinqlyTasksPage.detach === 'function') {
+            console.log('[Linqly] Detaching modular Tasks page due to extension disable');
+            window.LinqlyTasksPage.detach();
+        }
+        if (window.LinqlyActivitiesPage && typeof window.LinqlyActivitiesPage.detach === 'function') {
+            console.log('[Linqly] Detaching modular Activities page due to extension disable');
+            window.LinqlyActivitiesPage.detach();
+        }
+        if (window.LinqlyBillingPage && typeof window.LinqlyBillingPage.detach === 'function') {
+            console.log('[Linqly] Detaching modular Billing page due to extension disable');
+            window.LinqlyBillingPage.detach();
+        }
+        if (window.LinqlyDocumentsPage && typeof window.LinqlyDocumentsPage.detach === 'function') {
+            console.log('[Linqly] Detaching modular Documents page due to extension disable');
+            window.LinqlyDocumentsPage.detach();
         }
     }
 }
 
 // Read initial setting then apply
-function initFromStorage() {
+async function initFromStorage() {
     return new Promise((resolve) => {
-        chrome.storage.sync.get({ linqly_enabled: true }, (res) => {
+        chrome.storage.sync.get({ linqly_enabled: true }, async (res) => {
             console.log('[Linqly] Initial load, enabled state:', res.linqly_enabled);
-            applyEnabledState(res.linqly_enabled);
+            await applyEnabledState(res.linqly_enabled);
             resolve();
         });
     });
@@ -1459,6 +1455,7 @@ let isInitialized = false;
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'EXTENSION_ENABLED') {
     console.log('[Linqly] Received EXTENSION_ENABLED message, reinitializing...');
+    // Always reinitialize to ensure modular pages are properly handled
     initializeExtension();
   }
   return false; // We don't need to keep the message channel open
@@ -1466,11 +1463,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Main initialization function
 function initializeExtension() {
-  if (isInitialized) {
-    console.log('[Linqly] Extension already initialized, skipping reinitialization');
-    return Promise.resolve();
-  }
-  
   console.log('[Linqly] Initializing extension...');
   
   // Initialize from storage
@@ -1508,7 +1500,9 @@ window.addEventListener('load', () => {
 chrome.storage.onChanged.addListener((changes, namespace) => {
     if (namespace === 'sync' && changes.linqly_enabled) {
         console.log('[Linqly] Storage change detected, enabled:', changes.linqly_enabled.newValue);
-        applyEnabledState(changes.linqly_enabled.newValue);
+        applyEnabledState(changes.linqly_enabled.newValue).catch(error => {
+            console.error('[Linqly] Error applying enabled state:', error);
+        });
     }
 });
 
@@ -1516,6 +1510,74 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 chrome.runtime.onMessage.addListener((msg) => {
     if (msg.type === 'SETTINGS_UPDATED' && msg.settings && typeof msg.settings.linqly_enabled !== 'undefined') {
         console.log('[Linqly] Message received, enabled:', msg.settings.linqly_enabled);
-        applyEnabledState(msg.settings.linqly_enabled);
+        applyEnabledState(msg.settings.linqly_enabled).catch(error => {
+            console.error('[Linqly] Error applying enabled state from message:', error);
+        });
     }
 });
+
+// Load shared utilities
+if (typeof LinqlyUtils === 'undefined') {
+    // If shared utils aren't loaded, we'll load them dynamically
+    console.log('[Linqly] Shared utilities not found, loading dynamically');
+}
+
+// Reference page-specific modules (they're already declared in their respective files)
+// The modular pages declare themselves on the window object
+console.log('[Linqly] Checking for modular page modules...');
+
+// Direct route change handler for modular pages
+function handleModularPageRouteChange() {
+    console.log('[Linqly] Direct modular page route change handler triggered');
+    
+    // Check extension state and initialize appropriate modular page
+    chrome.storage.sync.get({ linqly_enabled: true }, (res) => {
+        if (!res.linqly_enabled) {
+            console.log('[Linqly] Extension disabled, not initializing modular pages');
+            return;
+        }
+        
+        const currentPath = window.location.href;
+        console.log('[Linqly] Current path:', currentPath);
+        
+        // Check and initialize Matters page if needed
+        if (window.LinqlyMattersPage && window.LinqlyMattersPage.shouldInitialize()) {
+            console.log('[Linqly] Direct handler: Initializing Matters page');
+            window.LinqlyMattersPage.initialize();
+        }
+        
+        // Check and initialize Contacts page if needed
+        if (window.LinqlyContactsPage && window.LinqlyContactsPage.shouldInitialize()) {
+            console.log('[Linqly] Direct handler: Initializing Contacts page');
+            window.LinqlyContactsPage.initialize();
+        }
+        
+        // Check and initialize Tasks page if needed
+        if (window.LinqlyTasksPage && window.LinqlyTasksPage.shouldInitialize()) {
+            console.log('[Linqly] Direct handler: Initializing Tasks page');
+            window.LinqlyTasksPage.initialize();
+        }
+        
+        // Check and initialize Activities page if needed
+        if (window.LinqlyActivitiesPage && window.LinqlyActivitiesPage.shouldInitialize()) {
+            console.log('[Linqly] Direct handler: Initializing Activities page');
+            window.LinqlyActivitiesPage.initialize();
+        }
+        
+        // Check and initialize Documents page if needed
+        if (window.LinqlyDocumentsPage && window.LinqlyDocumentsPage.shouldInitialize()) {
+            console.log('[Linqly] Direct handler: Initializing Documents page');
+            window.LinqlyDocumentsPage.initialize();
+        }
+        
+        // Check and initialize Billing page if needed
+        if (window.LinqlyBillingPage && window.LinqlyBillingPage.shouldInitialize()) {
+            console.log('[Linqly] Direct handler: Initializing Billing page');
+            window.LinqlyBillingPage.initialize();
+        }
+    });
+}
+
+// Set up direct route change listeners
+window.addEventListener('hashchange', handleModularPageRouteChange);
+window.addEventListener('popstate', handleModularPageRouteChange);

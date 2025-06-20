@@ -205,8 +205,18 @@ class CommunicationsRowSelector {
 }
 
 // Initialize when DOM is ready
+function shouldInitCommunicationsPage() {
+  const href = window.location.href;
+  // Exclude matter-level communications subpages (e.g., /matters/123/communications)
+  const isMatterCommunications = /\/matters\/[\d\w-]+\/communications/.test(href);
+  // Only run on main communications list
+  return (href.includes('/communications') || href.includes('#/communications')) && !isMatterCommunications;
+}
+
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => new CommunicationsRowSelector().init());
+  document.addEventListener('DOMContentLoaded', () => {
+    if (shouldInitCommunicationsPage()) new CommunicationsRowSelector().init();
+  });
 } else {
-  new CommunicationsRowSelector().init();
+  if (shouldInitCommunicationsPage()) new CommunicationsRowSelector().init();
 }

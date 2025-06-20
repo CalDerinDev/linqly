@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Linqly for Clio",
   "version": "1.0.0",
-  "description": "Enhanced productivity tools for Clio - Advanced table selection, bulk actions, and workflow improvements.",
+  "description": "Enhanced legal productivity tools for Clio - advanced table selection, bulk actions, and workflow improvements.",
   "permissions": [
     "scripting",
     "storage",
@@ -17,13 +17,13 @@
     {
       "matches": ["https://*.clio.com/*"],
       "exclude_matches": ["https://*.clio.com/communications*"],
-      "js": ["content.js"],
+      "js": ["shared/utils.js", "pages/matters.js", "pages/contacts.js", "pages/tasks.js", "pages/activities.js", "pages/billing.js", "pages/documents.js", "pages/newbills.js", "content.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     },
     {
       "matches": ["https://*.clio.com/communications*"],
-      "js": ["communications.js"],
+      "js": ["shared/utils.js", "pages/communications.js"],
       "css": ["styles.css"],
       "run_at": "document_idle"
     }
