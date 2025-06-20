@@ -527,81 +527,22 @@ const rowClickSelectFeature = {
                 return;
             }
 
-            console.log('[Linqly] Click event detected. Shift key pressed?', event.shiftKey);
-            console.log('[Linqly] Current lastClickedRow:', this.lastClickedRow);
-
-            const path = window.location.pathname + window.location.hash;
-            const isDocumentsPage = path.includes('/documents') || path.includes('#/documents');
-            const isMattersPage = path.includes('/matters') || path.includes('#/matters');
-            
-            // Check if the click is directly on a checkbox or its label
-            const isCheckboxClick = event.target.matches('input[type="checkbox"], label') || 
-                                  event.target.closest('input[type="checkbox"], label');
-            
-            // For Documents page, allow native checkbox clicks to work
-            if (isDocumentsPage && isCheckboxClick) {
-                console.log('[Linqly] Direct checkbox click on documents page, letting native handler work');
-                return;
-            }
-            
-            // Skip if the click is on other interactive elements
-            const isInteractive = event.target.matches('a, button, select, textarea, [role="button"], [role="tab"]') || 
-                                event.target.closest('a, button, select, textarea, [role="button"], [role="tab"]');
-            
-            if (isInteractive) {
-                console.log('[Linqly] Click on interactive element, ignoring');
-                return;
-            }
-            
             const selectors = this.getSelectors();
+            const isCheckbox = event.target.matches(selectors.checkbox);
             const row = event.target.closest(selectors.row);
-            if (!row) {
-                console.log('[Linqly] Click outside row, resetting lastClickedRow');
-                this.lastClickedRow = null;
-                return;
-            }
 
-            // Find the checkbox in the row
-            const checkbox = row.querySelector(selectors.checkbox);
-            if (!checkbox) {
-                console.log('[Linqly] Checkbox not found with selector:', selectors.checkbox);
-                console.log('[Linqly] Row HTML:', row.outerHTML.substring(0, 500));
-                console.log('[Linqly] Available checkboxes in row:', row.querySelectorAll('input[type="checkbox"]'));
-                console.log('[Linqly] Available spans in row:', row.querySelectorAll('span[role="checkbox"]'));
-                console.log('[Linqly] Available .th-checkbox elements:', row.querySelectorAll('.th-checkbox'));
-                return;
-            }
-            
-            console.log('[Linqly] Found checkbox:', checkbox);
-            console.log('[Linqly] Checkbox tag name:', checkbox.tagName);
-            console.log('[Linqly] Checkbox role:', checkbox.getAttribute('role'));
-            console.log('[Linqly] Checkbox checked state:', this.getCheckboxState(checkbox));
-            console.log('[Linqly] Checkbox attributes:', {
-                type: checkbox.type,
-                ngModel: checkbox.getAttribute('ng-model'),
-                className: checkbox.className,
-                id: checkbox.id,
-                role: checkbox.getAttribute('role'),
-                ariaChecked: checkbox.getAttribute('aria-checked')
-            });
-            
-            try {
+            // If the click is on a native checkbox, handle shift+click logic here
+            if (isCheckbox && row) {
                 // Prevent text selection during shift-click
                 if (event.shiftKey) {
                     event.preventDefault();
-                    
-                    // Add shift-click-active class to prevent text selection
                     const gridContainer = container.closest('.k-grid-content, .k-grid-table-wrap, [kendo-grid], .cc-tree-view');
                     if (gridContainer) {
                         gridContainer.classList.add('shift-click-active');
-                        
-                        // Remove the class after a short delay
                         setTimeout(() => {
                             gridContainer.classList.remove('shift-click-active');
                         }, 1000);
                     }
-                    
-                    // Also prevent text selection via JavaScript
                     if (window.getSelection) {
                         const selection = window.getSelection();
                         if (selection.removeAllRanges) {
@@ -611,143 +552,42 @@ const rowClickSelectFeature = {
                         }
                     }
                 }
-
-                // Handle shift-click range selection
+                // Shift+click logic
                 if (event.shiftKey && this.lastClickedRow) {
-                    console.log('[Linqly] Running SHIFT-CLICK logic');
-                    console.log('[Linqly] Anchor row:', this.lastClickedRow);
-                    console.log('[Linqly] Target row:', row);
-                    try {
-                        console.log('[Linqly] Anchor row UID:', this.getRowUid(this.lastClickedRow));
-                        console.log('[Linqly] Target row UID:', this.getRowUid(row));
-                    } catch (error) {
-                        console.log('[Linqly] Error getting row UIDs:', error.message);
-                    }
-                    
-                    // Get the grid body (table body) that contains both rows
                     const gridBody = row.closest('tbody');
-                    if (!gridBody) {
-                        console.log('[Linqly] No grid body found');
-                        return;
-                    }
-                    
-                    // Step A: Get all rows and filter for only those VISIBLE to the user
+                    if (!gridBody) return;
                     const allRowsInDom = Array.from(gridBody.querySelectorAll(selectors.row));
-                    const visibleRows = allRowsInDom.filter(row => row.offsetParent !== null);
-                    
-                    console.log('[Linqly] Found', visibleRows.length, 'visible rows');
-                    
-                    // Step B: Get the stable UID from each visible row. This list will not become stale.
-                    const visibleRowUids = visibleRows.map(row => {
-                        // Try different UID attributes that Clio might use
-                        return row.getAttribute('data-uid') || 
-                               row.getAttribute('data-kendo-uid') || 
-                               row.getAttribute('id') || 
-                               row.getAttribute('data-row-index') ||
-                               row.textContent.trim().substring(0, 50); // Fallback to text content
-                    });
-                    
-                    console.log('[Linqly] Row UIDs:', visibleRowUids);
-                    
-                    // Step C: Find the start and end positions in our stable UID array.
+                    const visibleRows = allRowsInDom.filter(r => r.offsetParent !== null);
+                    const visibleRowUids = visibleRows.map(r => this.getRowUid(r));
                     const startUid = this.getRowUid(this.lastClickedRow);
                     const endUid = this.getRowUid(row);
                     const startIndex = visibleRowUids.indexOf(startUid);
                     const endIndex = visibleRowUids.indexOf(endUid);
-                    
-                    console.log('[Linqly] Start UID:', startUid, 'End UID:', endUid);
-                    console.log('[Linqly] Row indices - Start:', startIndex, 'End:', endIndex);
-                    
-                    // Ensure we have valid start/end points
-                    if (startIndex === -1 || endIndex === -1) {
-                        console.log('[Linqly] Invalid start or end index');
-                        return;
-                    }
-                    
+                    if (startIndex === -1 || endIndex === -1) return;
                     const rangeStart = Math.min(startIndex, endIndex);
                     const rangeEnd = Math.max(startIndex, endIndex);
-                    
-                    console.log('[Linqly] Processing range from index', rangeStart, 'to', rangeEnd);
-                    
-                    // Step D: Loop through the STABLE UID array.
                     for (let i = rangeStart; i <= rangeEnd; i++) {
                         const currentUid = visibleRowUids[i];
-                        
-                        // Skip processing the anchor row and target row - they get special handling
-                        if (currentUid === startUid) {
-                            console.log('[Linqly] Skipping anchor row processing to preserve its state');
-                            continue;
-                        }
-                        
-                        if (currentUid === endUid) {
-                            console.log('[Linqly] Skipping target row in main loop - will handle separately');
-                            continue;
-                        }
-                        
-                        // Step E: On each iteration, find the FRESH, LIVE row from the DOM.
-                        const liveRow = gridBody.querySelector(`tr[data-uid="${currentUid}"], tr[data-kendo-uid="${currentUid}"], tr[id="${currentUid}"], tr[data-row-index="${currentUid}"]`);
-                        
-                        // If not found by attribute, try to find by text content (fallback)
-                        let foundRow = liveRow;
-                        if (!foundRow) {
-                            foundRow = Array.from(gridBody.querySelectorAll(selectors.row)).find(row => 
-                                this.getRowUid(row) === currentUid
-                            );
-                        }
-                        
-                        if (foundRow) {
-                            const checkboxInRange = foundRow.querySelector(selectors.checkbox);
+                        if (currentUid === startUid || currentUid === endUid) continue;
+                        const liveRow = gridBody.querySelector(`tr[data-uid="${currentUid}"], tr[data-kendo-uid="${currentUid}"], tr[id="${currentUid}"], tr[data-row-index="${currentUid}"]`)
+                            || Array.from(gridBody.querySelectorAll(selectors.row)).find(r => this.getRowUid(r) === currentUid);
+                        if (liveRow) {
+                            const checkboxInRange = liveRow.querySelector(selectors.checkbox);
                             if (checkboxInRange) {
-                                console.log('[Linqly] Processing row', i, 'with UID:', currentUid);
-                                this.setCheckboxState(checkboxInRange, true, foundRow, isMattersPage);
+                                this.setCheckboxState(checkboxInRange, true, liveRow, false);
                             }
-                        } else {
-                            console.log('[Linqly] Could not find live row for UID:', currentUid);
                         }
                     }
-                    
-                    // Special handling for the target row (last row in range) to ensure it's selected
-                    const targetUid = endUid;
-                    console.log('[Linqly] Looking for target row with UID:', targetUid);
-                    
-                    const targetLiveRow = gridBody.querySelector(`tr[data-uid="${targetUid}"], tr[data-kendo-uid="${targetUid}"], tr[id="${targetUid}"], tr[data-row-index="${targetUid}"]`);
-                    
-                    if (targetLiveRow) {
-                        console.log('[Linqly] Found target live row:', targetLiveRow);
-                        const targetCheckbox = targetLiveRow.querySelector(selectors.checkbox);
-                        if (targetCheckbox) {
-                            console.log('[Linqly] Found target checkbox:', targetCheckbox);
-                            console.log('[Linqly] Target checkbox current state:', this.getCheckboxState(targetCheckbox));
-                            console.log('[Linqly] Ensuring target row is selected:', targetUid);
-                            this.setCheckboxState(targetCheckbox, true, targetLiveRow, isMattersPage);
-                            console.log('[Linqly] Target checkbox state after processing:', this.getCheckboxState(targetCheckbox));
-                        } else {
-                            console.log('[Linqly] Target checkbox not found in target row');
-                        }
-                    } else {
-                        console.log('[Linqly] Target live row not found for UID:', targetUid);
-                    }
-                    
-                    // Do not update lastClickedRow during shift-click
-                    console.log('[Linqly] Shift-click complete, preserving anchor row');
+                    // Always select the target row's checkbox
+                    this.setCheckboxState(event.target, true, row, false);
+                    // Do not update lastClickedRow on shift+click
+                    return;
                 } else {
-                    console.log('[Linqly] Running NORMAL CLICK logic');
-                    // Normal click behavior - toggle the checkbox
-                    const newState = !this.getCheckboxState(checkbox);
-                    this.setCheckboxState(checkbox, newState, row, isMattersPage);
-                    
-                    // Update lastClickedRow for future shift-clicks only on normal clicks
+                    // Normal click: update lastClickedRow
                     this.lastClickedRow = row;
-                    console.log('[Linqly] New anchor row set:', this.lastClickedRow);
-                    try {
-                        console.log('[Linqly] Anchor row UID:', this.getRowUid(this.lastClickedRow));
-                    } catch (error) {
-                        console.log('[Linqly] Error getting anchor row UID:', error.message);
-                    }
                 }
-            } catch (error) {
-                console.error('[Linqly] Error handling row click:', error);
             }
+            // ... existing code ...
         };
         
         // Use capture phase with passive: false to allow preventDefault

@@ -113,23 +113,163 @@ const LinqlyMattersPage = {
             this.listener = null;
         }
         
+        const selectors = this.getSelectors();
+        
         // Add mouse event listeners to prevent text selection during shift+click
         this.addMouseEventListeners(container);
+
+        // Helper to match both native and custom checkboxes
+        const isAnyCheckbox = (el) =>
+            el.matches('input[type="checkbox"]') || el.matches('span[role="checkbox"]');
+        // Mousedown handler for native/custom checkboxes
+        const handleCheckboxMouseDown = (event) => {
+            console.log('[Linqly] [mousedown] event:', event.type, 'shift?', event.shiftKey, 'target:', event.target);
+            if (!event.isTrusted) return;
+            const isCheckbox = isAnyCheckbox(event.target);
+            const row = event.target.closest(selectors.row);
+            if (!isCheckbox || !row) return;
+            if (event.shiftKey) {
+                if (!this.lastClickedRow) {
+                    this.lastClickedRow = row;
+                }
+                if (this.lastClickedRow) {
+                    event.preventDefault();
+                    // --- Run range selection logic (now includes anchor and target row) ---
+                    const gridBody = row.closest('tbody');
+                    if (!gridBody) return;
+                    const allRowsInDom = Array.from(gridBody.querySelectorAll(selectors.row));
+                    const visibleRows = allRowsInDom.filter(r => r.offsetParent !== null);
+                    const visibleRowUids = visibleRows.map(r => LinqlyUtils.getRowUid(r));
+                    const startUid = LinqlyUtils.getRowUid(this.lastClickedRow);
+                    const endUid = LinqlyUtils.getRowUid(row);
+                    const startIndex = visibleRowUids.indexOf(startUid);
+                    const endIndex = visibleRowUids.indexOf(endUid);
+                    if (startIndex === -1 || endIndex === -1) return;
+                    const rangeStart = Math.min(startIndex, endIndex);
+                    const rangeEnd = Math.max(startIndex, endIndex);
+                    for (let i = rangeStart; i <= rangeEnd; i++) {
+                        const currentUid = visibleRowUids[i];
+                        const liveRow = gridBody.querySelector(`tr[data-uid="${currentUid}"], tr[data-kendo-uid="${currentUid}"], tr[id="${currentUid}"], tr[data-row-index="${currentUid}"]`)
+                            || Array.from(gridBody.querySelectorAll(selectors.row)).find(r => LinqlyUtils.getRowUid(r) === currentUid);
+                        if (liveRow) {
+                            const checkboxInRange = liveRow.querySelector(selectors.checkbox);
+                            if (checkboxInRange) {
+                                LinqlyUtils.setCheckboxState(checkboxInRange, true, liveRow, 'matters');
+                            }
+                        }
+                    }
+                    // Explicitly set the anchor and target checkboxes
+                    const anchorRow = gridBody.querySelector(`tr[data-uid="${startUid}"], tr[data-kendo-uid="${startUid}"], tr[id="${startUid}"], tr[data-row-index="${startUid}"]`)
+                        || Array.from(gridBody.querySelectorAll(selectors.row)).find(r => LinqlyUtils.getRowUid(r) === startUid);
+                    if (anchorRow) {
+                        const anchorCheckbox = anchorRow.querySelector(selectors.checkbox);
+                        if (anchorCheckbox) {
+                            LinqlyUtils.setCheckboxState(anchorCheckbox, true, anchorRow, 'matters');
+                        }
+                    }
+                    const targetRow = gridBody.querySelector(`tr[data-uid="${endUid}"], tr[data-kendo-uid="${endUid}"], tr[id="${endUid}"], tr[data-row-index="${endUid}"]`)
+                        || Array.from(gridBody.querySelectorAll(selectors.row)).find(r => LinqlyUtils.getRowUid(r) === endUid);
+                    if (targetRow) {
+                        const targetCheckbox = targetRow.querySelector(selectors.checkbox);
+                        if (targetCheckbox) {
+                            LinqlyUtils.setCheckboxState(targetCheckbox, true, targetRow, 'matters');
+                        }
+                    }
+                    // Do not update lastClickedRow on shift+click
+                    return;
+                }
+            } else {
+                this.lastClickedRow = row;
+            }
+        };
+        container.addEventListener('mousedown', handleCheckboxMouseDown, true);
+        // --- End native/custom checkbox shift+click support ---
         
         // Store reference to bound function for removal
         const handleClick = (event) => {
+            console.log('[Linqly] [click] event:', event.type, 'shift?', event.shiftKey, 'target:', event.target);
+            // Ignore all checkbox clicks (let mousedown handle them)
+            if (isAnyCheckbox(event.target)) {
+                return;
+            }
+            // Only treat as interactive if not a checkbox with shift held
+            if (!(isAnyCheckbox(event.target) && event.shiftKey)) {
+                const isInteractive = event.target.matches('a, button, input, select, textarea, [role="button"], [role="tab"]') ||
+                    event.target.closest('a, button, input, select, textarea, [role="button"], [role="tab"]');
+                if (isInteractive) {
+                    console.log('[Linqly] Click on interactive element, ignoring');
+                    return;
+                }
+            }
             // Ignore synthetic events triggered by scripts (like Clio's Angular framework)
             if (!event.isTrusted) {
                 console.log('[Linqly] Ignoring synthetic event (not user-triggered)');
                 return;
             }
 
+            const isCheckbox = event.target.matches(selectors.checkbox);
+            const row = event.target.closest(selectors.row);
+
+            // If the click is on a native checkbox, handle shift+click logic here
+            if (isCheckbox && row) {
+                // Prevent text selection during shift-click
+                if (event.shiftKey) {
+                    event.preventDefault();
+                    const gridContainer = container.closest('.k-grid-content, .k-grid-table-wrap, [kendo-grid]');
+                    if (gridContainer) {
+                        gridContainer.classList.add('shift-click-active');
+                        setTimeout(() => {
+                            gridContainer.classList.remove('shift-click-active');
+                        }, 1000);
+                    }
+                    if (window.getSelection) {
+                        const selection = window.getSelection();
+                        if (selection.removeAllRanges) {
+                            selection.removeAllRanges();
+                        } else if (selection.empty) {
+                            selection.empty();
+                        }
+                    }
+                }
+                // Shift+click logic
+                if (event.shiftKey && this.lastClickedRow) {
+                    const gridBody = row.closest('tbody');
+                    if (!gridBody) return;
+                    const allRowsInDom = Array.from(gridBody.querySelectorAll(selectors.row));
+                    const visibleRows = allRowsInDom.filter(r => r.offsetParent !== null);
+                    const visibleRowUids = visibleRows.map(r => LinqlyUtils.getRowUid(r));
+                    const startUid = LinqlyUtils.getRowUid(this.lastClickedRow);
+                    const endUid = LinqlyUtils.getRowUid(row);
+                    const startIndex = visibleRowUids.indexOf(startUid);
+                    const endIndex = visibleRowUids.indexOf(endUid);
+                    if (startIndex === -1 || endIndex === -1) return;
+                    const rangeStart = Math.min(startIndex, endIndex);
+                    const rangeEnd = Math.max(startIndex, endIndex);
+                    for (let i = rangeStart; i <= rangeEnd; i++) {
+                        const currentUid = visibleRowUids[i];
+                        if (currentUid === startUid || currentUid === endUid) continue;
+                        const liveRow = gridBody.querySelector(`tr[data-uid="${currentUid}"], tr[data-kendo-uid="${currentUid}"], tr[id="${currentUid}"], tr[data-row-index="${currentUid}"]`)
+                            || Array.from(gridBody.querySelectorAll(selectors.row)).find(r => LinqlyUtils.getRowUid(r) === currentUid);
+                        if (liveRow) {
+                            const checkboxInRange = liveRow.querySelector(selectors.checkbox);
+                            if (checkboxInRange) {
+                                console.log('[Linqly] Processing row', i, 'with UID:', currentUid);
+                                LinqlyUtils.setCheckboxState(checkboxInRange, true, liveRow, 'matters');
+                            }
+                        }
+                    }
+                    // Always select the target row's checkbox
+                    LinqlyUtils.setCheckboxState(event.target, true, row, 'matters');
+                    // Do not update lastClickedRow on shift+click
+                    return;
+                } else {
+                    // Normal click: update lastClickedRow
+                    this.lastClickedRow = row;
+                }
+            }
+            
             console.log('[Linqly] Matters page click event detected. Shift key pressed?', event.shiftKey);
             console.log('[Linqly] Current lastClickedRow:', this.lastClickedRow);
-            
-            // Check if the click is directly on a checkbox or its label
-            const isCheckboxClick = event.target.matches('input[type="checkbox"], label') || 
-                                  event.target.closest('input[type="checkbox"], label');
             
             // Skip if the click is on other interactive elements
             const isInteractive = event.target.matches('a, button, select, textarea, [role="button"], [role="tab"]') || 
@@ -140,8 +280,6 @@ const LinqlyMattersPage = {
                 return;
             }
             
-            const selectors = this.getSelectors();
-            const row = event.target.closest(selectors.row);
             if (!row) {
                 console.log('[Linqly] Click outside row, resetting lastClickedRow');
                 this.lastClickedRow = null;
@@ -339,6 +477,7 @@ const LinqlyMattersPage = {
         this.listener = () => {
             console.log('[Linqly] Removing Matters page click listener');
             container.removeEventListener('click', handleClick, options);
+            container.removeEventListener('mousedown', handleCheckboxMouseDown, true);
         };
         
         console.log('[Linqly] Delegated listener attached to Matters grid content');
