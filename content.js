@@ -224,6 +224,9 @@ const rowClickSelectFeature = {
             this.setupRouteObserver();
         }
         
+        // Add CSS to prevent text selection during shift+click
+        this.addTextSelectionPreventionCSS();
+        
         // Function to try attaching the listener
         const tryAttach = () => {
             // Try to find the grid content - different selectors for different pages
@@ -283,6 +286,9 @@ const rowClickSelectFeature = {
             this.listener();
             this.listener = null;
         }
+        
+        // Add mouse event listeners to prevent text selection during shift+click
+        this.addMouseEventListeners(container);
         
         // Store reference to bound function for removal
         const handleClick = (event) => {
@@ -354,6 +360,27 @@ const rowClickSelectFeature = {
                 // Prevent text selection during shift-click
                 if (event.shiftKey) {
                     event.preventDefault();
+                    
+                    // Add shift-click-active class to prevent text selection
+                    const gridContainer = container.closest('.k-grid-content, .k-grid-table-wrap, [kendo-grid], .cc-tree-view');
+                    if (gridContainer) {
+                        gridContainer.classList.add('shift-click-active');
+                        
+                        // Remove the class after a short delay
+                        setTimeout(() => {
+                            gridContainer.classList.remove('shift-click-active');
+                        }, 1000);
+                    }
+                    
+                    // Also prevent text selection via JavaScript
+                    if (window.getSelection) {
+                        const selection = window.getSelection();
+                        if (selection.removeAllRanges) {
+                            selection.removeAllRanges();
+                        } else if (selection.empty) {
+                            selection.empty();
+                        }
+                    }
                 }
 
                 // Handle shift-click range selection
@@ -860,6 +887,12 @@ const rowClickSelectFeature = {
             this.listener = null;
         }
         
+        // Clean up mouse event listeners
+        this.removeMouseEventListeners();
+        
+        // Remove the CSS we added
+        this.removeTextSelectionPreventionCSS();
+        
         // Don't clean up route observer - keep it active to detect route changes
         // this.cleanupRouteObserver();
         
@@ -868,8 +901,154 @@ const rowClickSelectFeature = {
         this.tableBody = null;
         this.isInitialized = false;
         this.lastClickedRow = null;
+        this.isShiftPressed = false;
         
         console.log('[Linqly] Row-click feature fully detached');
+    },
+
+    addTextSelectionPreventionCSS() {
+        // Check if we already added the CSS to avoid duplicates
+        if (document.getElementById('linqly-text-selection-prevention')) {
+            return;
+        }
+        
+        const style = document.createElement('style');
+        style.id = 'linqly-text-selection-prevention';
+        style.textContent = `
+            /* Prevent text selection during shift+click operations */
+            .k-grid-content,
+            .k-grid-table-wrap,
+            [kendo-grid],
+            .cc-tree-view {
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
+            }
+            
+            /* Allow text selection in specific elements that should remain selectable */
+            .k-grid-content input,
+            .k-grid-content textarea,
+            .k-grid-content [contenteditable],
+            .k-grid-table-wrap input,
+            .k-grid-table-wrap textarea,
+            .k-grid-table-wrap [contenteditable],
+            [kendo-grid] input,
+            [kendo-grid] textarea,
+            [kendo-grid] [contenteditable],
+            .cc-tree-view input,
+            .cc-tree-view textarea,
+            .cc-tree-view [contenteditable] {
+                -webkit-user-select: text;
+                -moz-user-select: text;
+                -ms-user-select: text;
+                user-select: text;
+            }
+            
+            /* Prevent text selection specifically during shift+click */
+            .k-grid-content.shift-click-active,
+            .k-grid-table-wrap.shift-click-active,
+            [kendo-grid].shift-click-active,
+            .cc-tree-view.shift-click-active {
+                -webkit-user-select: none !important;
+                -moz-user-select: none !important;
+                -ms-user-select: none !important;
+                user-select: none !important;
+            }
+        `;
+        
+        document.head.appendChild(style);
+        console.log('[Linqly] Added text selection prevention CSS');
+    },
+
+    removeTextSelectionPreventionCSS() {
+        const existingStyle = document.getElementById('linqly-text-selection-prevention');
+        if (existingStyle) {
+            existingStyle.remove();
+            console.log('[Linqly] Removed text selection prevention CSS');
+        }
+    },
+
+    addMouseEventListeners(container) {
+        // Store references to bound functions for cleanup
+        this.boundMouseDown = this.handleMouseDown.bind(this);
+        this.boundMouseMove = this.handleMouseMove.bind(this);
+        this.boundMouseUp = this.handleMouseUp.bind(this);
+        this.boundKeyDown = this.handleKeyDown.bind(this);
+        this.boundKeyUp = this.handleKeyUp.bind(this);
+        
+        // Add event listeners
+        container.addEventListener('mousedown', this.boundMouseDown, true);
+        container.addEventListener('mousemove', this.boundMouseMove, true);
+        container.addEventListener('mouseup', this.boundMouseUp, true);
+        document.addEventListener('keydown', this.boundKeyDown, true);
+        document.addEventListener('keyup', this.boundKeyUp, true);
+        
+        console.log('[Linqly] Added mouse event listeners for text selection prevention');
+    },
+
+    handleMouseDown(event) {
+        // If shift key is pressed, prevent text selection
+        if (event.shiftKey) {
+            event.preventDefault();
+            this.isShiftPressed = true;
+        }
+    },
+
+    handleMouseMove(event) {
+        // If shift is pressed and mouse is moving, prevent text selection
+        if (this.isShiftPressed) {
+            event.preventDefault();
+        }
+    },
+
+    handleMouseUp(event) {
+        // Clear shift pressed state
+        this.isShiftPressed = false;
+    },
+
+    handleKeyDown(event) {
+        // Track shift key state
+        if (event.key === 'Shift') {
+            this.isShiftPressed = true;
+        }
+    },
+
+    handleKeyUp(event) {
+        // Clear shift key state
+        if (event.key === 'Shift') {
+            this.isShiftPressed = false;
+        }
+    },
+
+    removeMouseEventListeners() {
+        // Clean up mouse event listeners
+        if (this.tableBody) {
+            if (this.boundMouseDown) {
+                this.tableBody.removeEventListener('mousedown', this.boundMouseDown, true);
+                this.boundMouseDown = null;
+            }
+            if (this.boundMouseMove) {
+                this.tableBody.removeEventListener('mousemove', this.boundMouseMove, true);
+                this.boundMouseMove = null;
+            }
+            if (this.boundMouseUp) {
+                this.tableBody.removeEventListener('mouseup', this.boundMouseUp, true);
+                this.boundMouseUp = null;
+            }
+        }
+        
+        // Clean up document-level key listeners
+        if (this.boundKeyDown) {
+            document.removeEventListener('keydown', this.boundKeyDown, true);
+            this.boundKeyDown = null;
+        }
+        if (this.boundKeyUp) {
+            document.removeEventListener('keyup', this.boundKeyUp, true);
+            this.boundKeyUp = null;
+        }
+        
+        console.log('[Linqly] Removed mouse event listeners');
     }
 };
 
