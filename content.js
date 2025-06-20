@@ -332,16 +332,22 @@ const rowClickSelectFeature = {
                 console.log('[Linqly] Checkbox not found with selector:', selectors.checkbox);
                 console.log('[Linqly] Row HTML:', row.outerHTML.substring(0, 500));
                 console.log('[Linqly] Available checkboxes in row:', row.querySelectorAll('input[type="checkbox"]'));
+                console.log('[Linqly] Available spans in row:', row.querySelectorAll('span[role="checkbox"]'));
+                console.log('[Linqly] Available .th-checkbox elements:', row.querySelectorAll('.th-checkbox'));
                 return;
             }
             
             console.log('[Linqly] Found checkbox:', checkbox);
-            console.log('[Linqly] Checkbox checked state:', checkbox.checked);
+            console.log('[Linqly] Checkbox tag name:', checkbox.tagName);
+            console.log('[Linqly] Checkbox role:', checkbox.getAttribute('role'));
+            console.log('[Linqly] Checkbox checked state:', this.getCheckboxState(checkbox));
             console.log('[Linqly] Checkbox attributes:', {
                 type: checkbox.type,
                 ngModel: checkbox.getAttribute('ng-model'),
                 className: checkbox.className,
-                id: checkbox.id
+                id: checkbox.id,
+                role: checkbox.getAttribute('role'),
+                ariaChecked: checkbox.getAttribute('aria-checked')
             });
             
             try {
@@ -355,6 +361,12 @@ const rowClickSelectFeature = {
                     console.log('[Linqly] Running SHIFT-CLICK logic');
                     console.log('[Linqly] Anchor row:', this.lastClickedRow);
                     console.log('[Linqly] Target row:', row);
+                    try {
+                        console.log('[Linqly] Anchor row UID:', this.getRowUid(this.lastClickedRow));
+                        console.log('[Linqly] Target row UID:', this.getRowUid(row));
+                    } catch (error) {
+                        console.log('[Linqly] Error getting row UIDs:', error.message);
+                    }
                     
                     // Get the grid body (table body) that contains both rows
                     const gridBody = row.closest('tbody');
@@ -449,10 +461,10 @@ const rowClickSelectFeature = {
                         const targetCheckbox = targetLiveRow.querySelector(selectors.checkbox);
                         if (targetCheckbox) {
                             console.log('[Linqly] Found target checkbox:', targetCheckbox);
-                            console.log('[Linqly] Target checkbox current state:', targetCheckbox.checked);
+                            console.log('[Linqly] Target checkbox current state:', this.getCheckboxState(targetCheckbox));
                             console.log('[Linqly] Ensuring target row is selected:', targetUid);
                             this.setCheckboxState(targetCheckbox, true, targetLiveRow, isMattersPage);
-                            console.log('[Linqly] Target checkbox state after processing:', targetCheckbox.checked);
+                            console.log('[Linqly] Target checkbox state after processing:', this.getCheckboxState(targetCheckbox));
                         } else {
                             console.log('[Linqly] Target checkbox not found in target row');
                         }
@@ -465,12 +477,17 @@ const rowClickSelectFeature = {
                 } else {
                     console.log('[Linqly] Running NORMAL CLICK logic');
                     // Normal click behavior - toggle the checkbox
-                    const newState = !checkbox.checked;
+                    const newState = !this.getCheckboxState(checkbox);
                     this.setCheckboxState(checkbox, newState, row, isMattersPage);
                     
                     // Update lastClickedRow for future shift-clicks only on normal clicks
                     this.lastClickedRow = row;
                     console.log('[Linqly] New anchor row set:', this.lastClickedRow);
+                    try {
+                        console.log('[Linqly] Anchor row UID:', this.getRowUid(this.lastClickedRow));
+                    } catch (error) {
+                        console.log('[Linqly] Error getting anchor row UID:', error.message);
+                    }
                 }
             } catch (error) {
                 console.error('[Linqly] Error handling row click:', error);
@@ -504,19 +521,204 @@ const rowClickSelectFeature = {
                row.textContent.trim().substring(0, 50); // Fallback to text content
     },
 
+    /* Helper method to get the current state of a checkbox (works for both input and span) */
+    getCheckboxState(checkbox) {
+        if (checkbox.tagName === 'SPAN' && checkbox.getAttribute('role') === 'checkbox') {
+            // For custom checkbox spans, check the aria-checked attribute
+            const ariaChecked = checkbox.getAttribute('aria-checked');
+            if (ariaChecked === 'true') {
+                return true;
+            } else if (ariaChecked === 'false') {
+                return false;
+            } else {
+                // If aria-checked is empty or undefined, check the CSS classes
+                const hasCheckedClass = checkbox.classList.contains('checked');
+                const hasNgNotEmptyClass = checkbox.classList.contains('ng-not-empty');
+                const hasNgEmptyClass = checkbox.classList.contains('ng-empty');
+                
+                console.log('[Linqly] aria-checked is empty, checking CSS classes:', {
+                    hasCheckedClass,
+                    hasNgNotEmptyClass,
+                    hasNgEmptyClass,
+                    allClasses: checkbox.className
+                });
+                
+                // If it has the checked class or ng-not-empty (and not ng-empty), consider it checked
+                return hasCheckedClass || (hasNgNotEmptyClass && !hasNgEmptyClass);
+            }
+        } else {
+            // For regular checkboxes, use the checked property
+            return checkbox.checked;
+        }
+    },
+
     /* Helper method to set checkbox state and trigger necessary events */
     setCheckboxState(checkbox, newState, row, isMattersPage) {
+        // Check if this is a custom checkbox span
+        const isCustomCheckbox = checkbox.tagName === 'SPAN' && checkbox.getAttribute('role') === 'checkbox';
+        
+        if (isCustomCheckbox) {
+            console.log('[Linqly] Processing custom checkbox span');
+            console.log('[Linqly] Current aria-checked:', checkbox.getAttribute('aria-checked'));
+            console.log('[Linqly] Setting aria-checked to:', newState.toString());
+            
+            // For custom checkbox spans, set the aria-checked attribute
+            checkbox.setAttribute('aria-checked', newState.toString());
+            
+            // Also update CSS classes to reflect the state
+            if (newState) {
+                checkbox.classList.add('checked', 'ng-not-empty');
+                checkbox.classList.remove('ng-empty');
+            } else {
+                checkbox.classList.remove('checked', 'ng-not-empty');
+                checkbox.classList.add('ng-empty');
+            }
+            
+            console.log('[Linqly] Updated CSS classes:', checkbox.className);
+            
+            // Also try to find and update any hidden input that might be associated
+            const hiddenInput = checkbox.querySelector('input[type="checkbox"]') || 
+                               checkbox.closest('td').querySelector('input[type="checkbox"]') ||
+                               checkbox.closest('tr').querySelector('input[type="checkbox"]');
+            
+            if (hiddenInput) {
+                console.log('[Linqly] Found associated hidden input, updating its state');
+                hiddenInput.checked = newState;
+            }
+            
+            // For custom checkbox spans, we need to trigger Clio's Angular handler
+            // The key is to call the ng-click function that Clio expects
+            const ngClickAttr = checkbox.getAttribute('ng-click');
+            console.log('[Linqly] ng-click attribute:', ngClickAttr);
+            
+            // First, try to trigger the click handler that Clio expects
+            if (typeof checkbox.click === 'function') {
+                console.log('[Linqly] Calling checkbox.click()');
+                checkbox.click();
+            }
+            
+            // Also try to trigger the ng-click handler directly
+            try {
+                console.log('[Linqly] Attempting to trigger ng-click handler directly');
+                
+                // Create a synthetic click event that mimics a real user click
+                const syntheticClickEvent = new MouseEvent('click', {
+                    view: window,
+                    bubbles: true,
+                    cancelable: true,
+                    button: 0,
+                    buttons: 1,
+                    clientX: checkbox.getBoundingClientRect().left + 5,
+                    clientY: checkbox.getBoundingClientRect().top + 5
+                });
+                
+                // Set the target to the checkbox
+                Object.defineProperty(syntheticClickEvent, 'target', { value: checkbox });
+                Object.defineProperty(syntheticClickEvent, 'currentTarget', { value: checkbox });
+                
+                // Dispatch the event
+                checkbox.dispatchEvent(syntheticClickEvent);
+                
+            } catch (error) {
+                console.log('[Linqly] Error triggering ng-click handler:', error.message);
+            }
+            
+            // Also try to find and call the Angular controller method
+            if (ngClickAttr && ngClickAttr.includes('dataTableCtrl.rowCheckboxClickHandler')) {
+                console.log('[Linqly] Attempting to call Angular controller method');
+                
+                // Try to find the Angular scope and call the method
+                const row = checkbox.closest('tr');
+                if (row) {
+                    // Try to get the Angular scope from the row (only if angular is available)
+                    try {
+                        if (typeof angular !== 'undefined' && angular && angular.element) {
+                            const scope = angular.element(row).scope();
+                            if (scope && scope.dataTableCtrl && typeof scope.dataTableCtrl.rowCheckboxClickHandler === 'function') {
+                                console.log('[Linqly] Calling Angular controller method directly');
+                                scope.dataTableCtrl.rowCheckboxClickHandler();
+                            }
+                        } else {
+                            console.log('[Linqly] Angular not available, skipping direct controller call');
+                        }
+                    } catch (error) {
+                        console.log('[Linqly] Error accessing Angular scope:', error.message);
+                        // Continue with other methods even if Angular access fails
+                    }
+                    
+                    // Try a different approach - dispatch events that Angular will recognize
+                    try {
+                        console.log('[Linqly] Dispatching Angular-compatible events');
+                        
+                        // Dispatch a custom event that Angular might be listening for
+                        const customEvent = new CustomEvent('rowCheckboxClick', {
+                            bubbles: true,
+                            cancelable: true,
+                            detail: { row: row, checkbox: checkbox }
+                        });
+                        row.dispatchEvent(customEvent);
+                        
+                        // Also try dispatching a change event on the checkbox
+                        const changeEvent = new Event('change', { 
+                            bubbles: true, 
+                            cancelable: true 
+                        });
+                        checkbox.dispatchEvent(changeEvent);
+                        
+                        // And try dispatching an input event
+                        const inputEvent = new Event('input', { 
+                            bubbles: true, 
+                            cancelable: true 
+                        });
+                        checkbox.dispatchEvent(inputEvent);
+                        
+                    } catch (error) {
+                        console.log('[Linqly] Error dispatching Angular events:', error.message);
+                    }
+                }
+            }
+            
+            // Dispatch click event to trigger Angular handlers
+            const clickEvent = new MouseEvent('click', {
+                view: window,
+                bubbles: true,
+                cancelable: true,
+                button: 0,
+                buttons: 1
+            });
+            checkbox.dispatchEvent(clickEvent);
+            
+            // Also try clicking the parent row to trigger row selection
+            const parentRow = checkbox.closest('tr');
+            if (parentRow) {
+                console.log('[Linqly] Clicking parent row to trigger selection');
+                parentRow.click();
+            }
+            
+            // Verify the final state
+            setTimeout(() => {
+                const finalState = this.getCheckboxState(checkbox);
+                console.log('[Linqly] Final checkbox state after processing:', finalState);
+                console.log('[Linqly] Final aria-checked:', checkbox.getAttribute('aria-checked'));
+                console.log('[Linqly] Final CSS classes:', checkbox.className);
+            }, 100);
+            
+            return;
+        }
+        
+        // For regular checkboxes, use the existing logic
         // For shift-click range selection, always set to true regardless of current state
         // This ensures all rows in the range are selected, even if some were already selected
-        if (checkbox.checked === newState && newState === true) {
+        const currentState = this.getCheckboxState(checkbox);
+        if (currentState === newState && newState === true) {
             console.log('[Linqly] Checkbox already in desired state, but ensuring it stays selected');
             // Don't return early - still process the checkbox to ensure it stays selected
-        } else if (checkbox.checked === newState) {
+        } else if (currentState === newState) {
             console.log('[Linqly] Checkbox already in desired state, skipping change');
             return;
         }
 
-        console.log('[Linqly] Changing checkbox state from', checkbox.checked, 'to', newState);
+        console.log('[Linqly] Changing checkbox state from', currentState, 'to', newState);
         
         // Set the checkbox state
         checkbox.checked = newState;
@@ -633,7 +835,7 @@ const rowClickSelectFeature = {
         if (path.includes('/documents') || path.includes('#/documents')) {
             const selectors = {
                 ...common,
-                checkbox: 'td.row-selection-checkbox input[type="checkbox"], .th-checkbox, input[type="checkbox"][ng-model], input[type="checkbox"]',
+                checkbox: 'td.row-selection-checkbox input[type="checkbox"], .th-checkbox input[type="checkbox"], .th-checkbox span[role="checkbox"], span[role="checkbox"], input[type="checkbox"][ng-model], input[type="checkbox"]',
                 isCustomCheckbox: true
             };
             console.log('[Linqly] Using Documents page selectors:', selectors);
